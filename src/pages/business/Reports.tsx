@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useStore } from '../../store';
-import { methodLabel, money } from '../../lib/format';
-import { scoped, scopedWithAll } from '../../lib/scope';
+import { branchName, fmtTime, methodLabel, money } from '../../lib/format';
+import { scopedWithAll } from '../../lib/scope';
 import { folioDue } from '../../lib/folio';
-import { DataTable, MetricCard, Panel, PanelHead, ScopeNote } from '../../components/ui';
+import { dateKey } from '../rooms/timeline';
+import { DataTable, MetricCard, Panel, PanelHead } from '../../components/ui';
 
 const Bar = ({ label, value, max, text }: { label: string; value: number; max: number; text: string }) => (
   <div className="pms-bar">
@@ -12,48 +14,77 @@ const Bar = ({ label, value, max, text }: { label: string; value: number; max: n
   </div>
 );
 
+const shiftDay = (key: string, n: number) => {
+  const [y, m, d] = key.split('-').map(Number);
+  return dateKey(new Date(y, m - 1, d + n));
+};
+
+const dayLabel = (key: string) => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Intl.DateTimeFormat('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' }).format(new Date(y, m - 1, d));
+};
+
 export function Reports() {
   const { data } = useStore();
+  const today = dateKey(new Date());
+  const [day, setDay] = useState(today);
   const folios = scopedWithAll(data, data.folios);
-  const payments = folios.flatMap(b => b.payments);
-  const byMethod = (['cash', 'transfer', 'card'] as const).map(m => [methodLabel[m], payments.filter(p => p.method === m).reduce((s, p) => s + Number(p.amount), 0)] as const);
-  const lines = folios.flatMap(b => b.orderDetails);
-  const roomRev = lines.filter(i => i.productType === 6 && !/Phụ thu/.test(i.name)).reduce((s, i) => s + i.price * i.quantity, 0);
-  const surcharge = lines.filter(i => /Phụ thu/.test(i.name)).reduce((s, i) => s + i.price * i.quantity, 0);
-  const goods = lines.filter(i => i.productType !== 6).reduce((s, i) => s + i.price * i.quantity, 0);
-  const discount = folios.reduce((s, b) => s + Number(b.voucherDiscount || 0), 0);
-  const byType = (['Theo giờ', 'Qua đêm', 'Theo ngày'] as const).map(t => [t, folios.filter(b => b.stayType === t).length] as const);
-  const rooms = scoped(data, data.rooms);
-  const occ = rooms.filter(r => r.status === 'occupied').length;
-  const products = Object.entries(lines.filter(i => i.productType !== 6).reduce<Record<string, number>>((m, i) => {
-    const n = i.name.split(' · ')[0]; m[n] = (m[n] || 0) + i.quantity; return m;
-  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const receipts = folios
+    .flatMap(b => b.payments.map(p => ({ ...p, code: b.code, customer: b.customer, branchId: b.branchId, day: dateKey(new Date(p.createdAt)) })))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const sumOf = (list: typeof receipts) => list.reduce((s, p) => s + Number(p.amount), 0);
+  const dayReceipts = receipts.filter(p => p.day === day);
+  const total = sumOf(dayReceipts);
+  const prevTotal = sumOf(receipts.filter(p => p.day === shiftDay(day, -1)));
+  const byMethod = (['cash', 'transfer', 'card'] as const).map(m => [methodLabel[m], sumOf(dayReceipts.filter(p => p.method === m))] as const);
+  const week = Array.from({ length: 7 }, (_, i) => shiftDay(day, i - 6)).map(k => [k, sumOf(receipts.filter(p => p.day === k))] as const);
+  const due = folios.filter(b => dateKey(new Date(b.effectiveCheckInTime)) === day).reduce((s, b) => s + folioDue(b), 0);
   const maxM = Math.max(...byMethod.map(x => x[1]), 1);
-  const maxT = Math.max(...byType.map(x => x[1]), 1);
-  const debt = folios.reduce((s, b) => s + folioDue(b), 0);
+  const maxW = Math.max(...week.map(x => x[1]), 1);
+  const diff = total - prevTotal;
 
   return (
     <>
+      <div className="reception-grid-controls">
+        <div className="timeline-controls-left">
+          <div className="timeline-month">
+            <button type="button" aria-label="Ngày trước" onClick={() => setDay(shiftDay(day, -1))}><i className="bi bi-chevron-left" /></button>
+            <input className="form-control" type="date" value={day} max={today} onChange={e => e.target.value && setDay(e.target.value)} />
+            <button type="button" aria-label="Ngày sau" disabled={day >= today} onClick={() => setDay(shiftDay(day, 1))}><i className="bi bi-chevron-right" /></button>
+          </div>
+        </div>
+        <span>{day === today ? 'Hôm nay' : dayLabel(day)}</span>
+      </div>
       <div className="metric-grid">
-        <MetricCard label="Doanh thu (sau giảm giá)" value={money(roomRev + surcharge + goods - discount)} foot={`Phòng ${money(roomRev)} · Dịch vụ ${money(goods)}`} />
-        <MetricCard label="Đã thu" value={money(payments.reduce((s, p) => s + Number(p.amount), 0))} foot={`Còn nợ ${money(debt)}`} />
-        <MetricCard label="Công suất hiện tại" value={`${rooms.length ? Math.round(occ / rooms.length * 100) : 0}%`} foot={`${occ}/${rooms.length} phòng có khách`} />
-        <MetricCard label="Phụ thu quá giờ · Giảm giá" value={money(surcharge)} foot={`Voucher −${money(discount)}`} />
+        <MetricCard label="Tiền đã nhận" value={money(total)} foot={`${diff >= 0 ? '+' : '−'}${money(Math.abs(diff))} so với hôm trước`} />
+        <MetricCard label="Số giao dịch" value={dayReceipts.length} foot={dayReceipts.length ? `Trung bình ${money(Math.round(total / dayReceipts.length))}` : 'Chưa có giao dịch'} />
+        <MetricCard label="Tiền mặt" value={money(byMethod[0][1])} foot={`Chuyển khoản / thẻ ${money(byMethod[1][1] + byMethod[2][1])}`} />
+        <MetricCard label="Còn phải thu" value={money(due)} foot="Booking nhận phòng trong ngày" />
       </div>
       <div className="section-grid">
         <section className="panel">
-          <PanelHead title="Theo phương thức thanh toán" subtitle="Tiền đã thu theo từng kênh" />
-          {byMethod.map(([l, v]) => <Bar key={l} label={l} value={v} max={maxM} text={money(v)} />)}
+          <PanelHead title="7 ngày gần nhất" subtitle="Tiền đã nhận mỗi ngày" />
+          {week.map(([k, v]) => <Bar key={k} label={dayLabel(k)} value={v} max={maxW} text={money(v)} />)}
         </section>
         <section className="panel">
-          <PanelHead title="Theo hình thức lưu trú" subtitle="Số lượt booking" />
-          {byType.map(([l, v]) => <Bar key={l} label={l} value={v} max={maxT} text={`${v} lượt`} />)}
+          <PanelHead title="Theo phương thức" subtitle="Tiền đã nhận trong ngày" />
+          {byMethod.map(([l, v]) => <Bar key={l} label={l} value={v} max={maxM} text={money(v)} />)}
         </section>
       </div>
-      <Panel title="Sản phẩm bán chạy" subtitle="Món gọi kèm và gọi tại phòng">
-        <DataTable headers={['SẢN PHẨM', 'SỐ LƯỢNG']}>{products.map(([n, q]) => <tr key={n}><td><strong>{n}</strong></td><td>{q}</td></tr>)}</DataTable>
+      <Panel title="Giao dịch trong ngày" subtitle="Các khoản tiền đã nhận">
+        <DataTable headers={['GIỜ', 'MÃ ĐẶT', 'KHÁCH HÀNG', 'CHI NHÁNH', 'PHƯƠNG THỨC', 'SỐ TIỀN']}>
+          {dayReceipts.map(p => (
+            <tr key={p.id}>
+              <td>{fmtTime(p.createdAt)}</td>
+              <td><strong>#{p.code}</strong></td>
+              <td>{p.customer}</td>
+              <td>{branchName(p.branchId)}</td>
+              <td>{methodLabel[p.method] || p.method}</td>
+              <td><strong>{money(Number(p.amount))}</strong></td>
+            </tr>
+          ))}
+        </DataTable>
       </Panel>
-      <ScopeNote>Số liệu tính trực tiếp từ folio và thanh toán trong admin, không qua KiotViet.</ScopeNote>
     </>
   );
 }
