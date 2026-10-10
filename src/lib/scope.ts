@@ -4,7 +4,7 @@ type Scoped = { branchId: string };
 type Scope = Pick<DemoData, 'role' | 'branchId'>;
 
 export const SUPER_ONLY_PAGES = ['branches', 'settings'];
-export const SYSTEM_PAGES = ['dashboard', 'branches', 'reports', 'vouchers', 'staff', 'settings'];
+export const SYSTEM_PAGES = ['dashboard', 'branches', 'reports', 'staff'];
 export const isSystemScope = (d: Scope) => d.role === 'superadmin' && d.branchId === 'all';
 
 export const isPageAllowed = (d: Scope, page: string) =>

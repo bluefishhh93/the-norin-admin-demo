@@ -37,7 +37,6 @@ export const pageInfo: Record<string, [string, string, string]> = {
   pricing: ['Bảng giá', 'Bảng giá phòng', 'Giá theo giờ, qua đêm và theo ngày cho từng chi nhánh.'],
   vouchers: ['Voucher', 'Chương trình voucher', 'Tạo mã ưu đãi và theo dõi lượt sử dụng.'],
   products: ['Sản phẩm', 'Sản phẩm & dịch vụ', 'Danh mục hàng hóa và dịch vụ bán kèm.'],
-  inventory: ['Tồn kho', 'Tồn kho sản phẩm', 'Nhập hàng, xuất hủy và cảnh báo sắp hết.'],
   'room-classes': [
     'Hạng phòng & phòng',
     'Quản lý hạng phòng & phòng',
@@ -60,11 +59,6 @@ export const pageInfo: Record<string, [string, string, string]> = {
     'Thông tin chi nhánh',
     'Thông tin chi nhánh',
     'Hotline, đặt online, vị trí QR phòng và kênh thông báo.'
-  ],
-  settings: [
-    'Giờ & quy tắc',
-    'Giờ lưu trú & quy tắc vận hành',
-    'Thay cho cài đặt giờ của KiotViet; web, kiosk, tablet cùng dùng.'
   ],
   staff: [
     'Nhân sự & quyền',
@@ -104,8 +98,7 @@ export const navGroups: NavGroup[] = [
       { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo' },
       { page: 'pricing', icon: 'bi-tags', label: 'Bảng giá' },
       { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher' },
-      { page: 'products', icon: 'bi-bag', label: 'Sản phẩm' },
-      { page: 'inventory', icon: 'bi-box-seam', label: 'Tồn kho' }
+      { page: 'products', icon: 'bi-bag', label: 'Sản phẩm' }
     ]
   },
   {
@@ -123,7 +116,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { page: 'branches', icon: 'bi-buildings', label: 'Chi nhánh' },
       { page: 'branch-settings', icon: 'bi-geo-alt', label: 'Thông tin chi nhánh' },
-      { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc' },
       { page: 'staff', icon: 'bi-person-badge', label: 'Nhân sự & quyền' },
       { page: 'notifications', icon: 'bi-bell', label: 'Nhật ký thông báo' }
     ]
@@ -134,12 +126,10 @@ export const systemNavGroups: NavGroup[] = [
   { items: [
     { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan hệ thống' },
     { page: 'branches', icon: 'bi-buildings', label: 'Quản lý chi nhánh' },
-    { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo tổng hợp' },
-    { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher toàn hệ thống' }
+    { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo tổng hợp' }
   ] },
   { section: 'HỆ THỐNG', items: [
-    { page: 'staff', icon: 'bi-person-badge', label: 'Tài khoản hệ thống' },
-    { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc chung' }
+    { page: 'staff', icon: 'bi-person-badge', label: 'Tài khoản hệ thống' }
   ] }
 ];
 

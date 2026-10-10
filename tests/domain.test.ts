@@ -21,7 +21,8 @@ test('system and branch workspaces expose only their pages and data', () => {
   data.role = 'superadmin';
   data.branchId = 'all';
   assert.equal(isPageAllowed(data, 'branches'), true);
-  assert.equal(isPageAllowed(data, 'settings'), true);
+  assert.equal(isPageAllowed(data, 'settings'), false);
+  assert.equal(isPageAllowed(data, 'vouchers'), false);
   assert.equal(isPageAllowed(data, 'booking-lookup'), false);
   assert.equal(isPageAllowed(data, 'kiosks'), false);
   assert.equal(scoped(data, data.rooms).length, data.rooms.length);
@@ -31,6 +32,7 @@ test('system and branch workspaces expose only their pages and data', () => {
     data.branchId = 'mykhe';
     assert.equal(isPageAllowed(data, 'branches'), false);
     assert.equal(isPageAllowed(data, 'settings'), false);
+    assert.equal(isPageAllowed(data, 'vouchers'), true);
     assert.equal(isPageAllowed(data, 'booking-lookup'), true);
     assert.equal(isPageAllowed(data, 'kiosks'), true);
     assert.equal(isPageAllowed(data, 'staff'), true);

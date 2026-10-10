@@ -13,14 +13,12 @@ import { Reports } from './business/Reports';
 import { Pricing } from './business/Pricing';
 import { Vouchers } from './business/Vouchers';
 import { Products } from './business/Products';
-import { Inventory } from './business/Inventory';
 import { RoomClasses } from './rooms/RoomClasses';
 import { Availability } from './rooms/Availability';
 import { Locks } from './rooms/Locks';
 import { RoomMusic } from './rooms/RoomMusic';
 import { Kiosks } from './system/Kiosks';
 import { BranchSettings } from './system/BranchSettings';
-import { Settings } from './system/Settings';
 import { Staff } from './system/Staff';
 export interface PageProps {
   navigate: (page: string) => void;
@@ -39,7 +37,6 @@ export const pages: Record<string, ComponentType<PageProps>> = {
   pricing: Pricing,
   vouchers: Vouchers,
   products: Products,
-  inventory: Inventory,
   'room-classes': RoomClasses,
   availability: Availability,
   locks: Locks,
@@ -47,7 +44,6 @@ export const pages: Record<string, ComponentType<PageProps>> = {
   kiosks: Kiosks,
   branches: Branches,
   'branch-settings': BranchSettings,
-  settings: Settings,
   staff: Staff,
   notifications: Notifications
 };

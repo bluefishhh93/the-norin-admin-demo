@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../../store';
-import { isSystemScope } from '../../lib/scope';
 import { createRoomQrDataUrl, downloadRoomQrPdf, roomQrUrl } from '../../lib/roomQr';
 
 export const QrImage = memo(function QrImage({
@@ -69,60 +68,8 @@ export const QrImage = memo(function QrImage({
 });
 
 export function QrDomainInput() {
-  const { data, update, toast } = useStore();
-  const [domain, setDomain] = useState(data.qrDomain);
-
-  const save = () => {
-    try {
-      const url = new URL(domain.trim().replace(/\/$/, ''));
-      if (
-        !['https:', 'http:'].includes(url.protocol) ||
-        url.pathname !== '/' ||
-        url.search ||
-        url.hash
-      )
-        throw new Error();
-      update((d) => {
-        d.qrDomain = url.origin;
-      });
-      setDomain(url.origin);
-      toast('Đã lưu tên miền QR.');
-    } catch {
-      toast(
-        'Nhập tên miền trang khách, ví dụ https://booking.example.com (không kèm đường dẫn phụ).'
-      );
-    }
-  };
-
-  if (!isSystemScope(data)) return <p className="small text-muted mb-0">Tên miền QR chung: {data.qrDomain || 'Chưa cấu hình'}. Cấu hình tại Giờ & quy tắc chung của hệ thống.</p>;
-
-  return (
-    <div className="qr-domain">
-      <label htmlFor="qrDomain">Tên miền</label>
-      <input
-        id="qrDomain"
-        className="form-control"
-        type="url"
-        placeholder="https://booking.example.com"
-        value={domain}
-        onChange={(e) => setDomain(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            save();
-          }
-        }}
-      />
-      <button
-        type="button"
-        className="btn btn-light"
-        onClick={save}
-        disabled={domain.trim() === data.qrDomain}
-      >
-        Lưu
-      </button>
-    </div>
-  );
+  const { data } = useStore();
+  return <p className="small text-muted mb-0">Tên miền QR chung: {data.qrDomain || 'Chưa cấu hình'}.</p>;
 }
 
 export function BranchQr({ branchId }: { branchId: string }) {
