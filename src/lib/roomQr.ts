@@ -5,7 +5,8 @@ const LOGO_PADDING_RATIO = 0.016;
 
 export type RoomQrItem = { masterProductId: number; name: string; url: string };
 
-export const roomQrUrl = (domain: string, masterProductId: number) => `${domain.replace(/\/$/, '')}/m?room=${masterProductId}`;
+export const roomQrUrl = (domain: string, masterProductId: number) =>
+  `${domain.replace(/\/$/, '')}/m?room=${masterProductId}`;
 
 let logoPromise: Promise<HTMLImageElement> | null = null;
 
@@ -14,7 +15,10 @@ function loadLogo(): Promise<HTMLImageElement> {
     logoPromise = new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => { logoPromise = null; reject(new Error('LOGO_LOAD_FAILED')); };
+      img.onerror = () => {
+        logoPromise = null;
+        reject(new Error('LOGO_LOAD_FAILED'));
+      };
       img.src = LOGO_SRC;
     });
   }
@@ -36,7 +40,14 @@ function tintLogo(img: HTMLImageElement, width: number, height: number, color: s
   return canvas;
 }
 
-export function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+export function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -54,7 +65,12 @@ export function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: num
 export async function createRoomQrCanvas(url: string, size = 1440): Promise<HTMLCanvasElement> {
   const { toCanvas } = await import('qrcode');
   const canvas = document.createElement('canvas');
-  await toCanvas(canvas, url, { width: size, margin: 1, errorCorrectionLevel: 'H', color: { dark: '#000000', light: '#ffffff' } });
+  await toCanvas(canvas, url, {
+    width: size,
+    margin: 1,
+    errorCorrectionLevel: 'H',
+    color: { dark: '#000000', light: '#ffffff' }
+  });
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
   try {
@@ -90,20 +106,32 @@ const CELL_H_MM = (PAGE_H_MM - MARGIN_MM * 2 - GAP_MM * (ROWS - 1)) / ROWS;
 const PX_PER_MM = 12;
 const FRAME_COLOR = '#800020';
 
-function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, centerX: number, startY: number, maxWidth: number, lineHeight: number, maxLines: number) {
+function drawWrappedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  startY: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number
+) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
-  words.some(word => {
+  words.some((word) => {
     const candidate = current ? `${current} ${word}` : word;
     if (ctx.measureText(candidate).width <= maxWidth || !current) current = candidate;
-    else { lines.push(current); current = word; }
+    else {
+      lines.push(current);
+      current = word;
+    }
     return lines.length === maxLines;
   });
   if (lines.length < maxLines && current) lines.push(current);
   if (lines.length === maxLines) {
     let last = lines[maxLines - 1];
-    while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+    while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth)
+      last = last.slice(0, -1);
     if (lines.join(' ').length < text.length) lines[maxLines - 1] = `${last}…`;
   }
   lines.forEach((line, i) => ctx.fillText(line, centerX, startY + i * lineHeight));
@@ -138,7 +166,13 @@ async function renderTile(item: RoomQrItem): Promise<HTMLCanvasElement> {
   const qrCanvas = await createRoomQrCanvas(item.url, 1440);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(qrCanvas, Math.round((frameW - qrSize) / 2), Math.round((frameH - qrSize) / 2), qrSize, qrSize);
+  ctx.drawImage(
+    qrCanvas,
+    Math.round((frameW - qrSize) / 2),
+    Math.round((frameH - qrSize) / 2),
+    qrSize,
+    qrSize
+  );
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -146,12 +180,24 @@ async function renderTile(item: RoomQrItem): Promise<HTMLCanvasElement> {
   ctx.font = `700 ${nameSize}px "Segoe UI", Roboto, Arial, sans-serif`;
   ctx.fillStyle = '#111827';
   const lineHeight = Math.round(nameSize * 1.25);
-  const usedLines = drawWrappedText(ctx, item.name, width / 2, frameH + Math.round(labelH * 0.14), width * 0.92, lineHeight, 2);
+  const usedLines = drawWrappedText(
+    ctx,
+    item.name,
+    width / 2,
+    frameH + Math.round(labelH * 0.14),
+    width * 0.92,
+    lineHeight,
+    2
+  );
 
   const idSize = Math.round(height * 0.032);
   ctx.font = `400 ${idSize}px "Segoe UI", Roboto, Arial, sans-serif`;
   ctx.fillStyle = '#6b7280';
-  ctx.fillText(`Room ID: ${item.masterProductId}`, width / 2, frameH + Math.round(labelH * 0.14) + usedLines * lineHeight + Math.round(idSize * 0.3));
+  ctx.fillText(
+    `Room ID: ${item.masterProductId}`,
+    width / 2,
+    frameH + Math.round(labelH * 0.14) + usedLines * lineHeight + Math.round(idSize * 0.3)
+  );
   return canvas;
 }
 

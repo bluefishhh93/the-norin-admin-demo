@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react';
 import type { DemoData } from './types';
 import { createSeed } from './seed';
-import { syncBranches } from './seed/base';
-import { normalizeBookings } from './booking/model';
+import { normalizeBookings, syncBookings } from './booking/model';
+import { migrateClassReferences } from './lib/migrations';
 
 const STORAGE_KEY = 'norin_admin_demo_react_v1';
 
@@ -11,11 +20,16 @@ const load = (): DemoData => {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (saved && typeof saved === 'object' && Array.isArray(saved.rooms)) {
-      const restored = Object.fromEntries(Object.keys(base).map(k => [k, saved[k] ?? base[k as keyof DemoData]])) as unknown as DemoData;
+      const restored = Object.fromEntries(
+        Object.keys(base).map((k) => [k, saved[k] ?? base[k as keyof DemoData]])
+      ) as unknown as DemoData;
+      migrateClassReferences(restored);
       normalizeBookings(restored);
       return restored;
     }
-  } catch {}
+  } catch {
+    // Unreadable demo snapshots are replaced with the initial data.
+  }
   normalizeBookings(base);
   return base;
 };
@@ -37,17 +51,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DemoData>(load);
   const [toastText, setToastText] = useState<string | null>(null);
   const timer = useRef<number>();
-  syncBranches(data.branches);
-
   useEffect(() => {
     const id = window.setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { setToastText('Bộ nhớ trình duyệt đã đầy. Thay đổi chưa được lưu.'); }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {
+        setToastText('Bộ nhớ trình duyệt đã đầy. Thay đổi chưa được lưu.');
+      }
     }, 150);
     return () => window.clearTimeout(id);
   }, [data]);
 
   const update = useCallback((fn: Mutator) => {
-    setData(prev => { const draft = structuredClone(prev); fn(draft); return draft; });
+    setData((prev) => {
+      const draft = structuredClone(prev);
+      fn(draft);
+      syncBookings(draft);
+      return draft;
+    });
   }, []);
 
   const toast = useCallback((text: string) => {
@@ -57,9 +78,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeToast = useCallback(() => setToastText(null), []);
-  const reset = useCallback(() => { localStorage.removeItem(STORAGE_KEY); const seed = createSeed(); normalizeBookings(seed); setData(seed); }, []);
+  const reset = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    const seed = createSeed();
+    normalizeBookings(seed);
+    setData(seed);
+  }, []);
 
-  const value = useMemo(() => ({ data, update, reset, toast, toastText, closeToast }), [data, update, reset, toast, toastText, closeToast]);
+  const value = useMemo(
+    () => ({ data, update, reset, toast, toastText, closeToast }),
+    [data, update, reset, toast, toastText, closeToast]
+  );
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 

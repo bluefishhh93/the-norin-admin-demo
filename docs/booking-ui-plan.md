@@ -384,7 +384,7 @@ Các quy tắc cần chốt trước khi hoàn thiện màn tương ứng: giữ
 Các nguồn dưới đây để đối chiếu hiện trạng, không phải thiết kế code:
 
 - [Bảng phòng hiện tại](../src/pages/rooms/Bookings.tsx), [lưới đặt phòng](../src/pages/rooms/RoomTimeline.tsx) và [Lịch phòng riêng](../src/pages/Calendar.tsx).
-- [Tra cứu booking](../src/pages/workflow/BookingLookup.tsx), [Bảng phòng đang ở](../src/pages/workflow/RoomBoard.tsx) và [chi tiết/thu tiền hiện tại](../src/pages/workflow/shared.tsx).
+- [Tra cứu booking](../src/booking/BookingLookup.tsx), [Bảng phòng đang ở](../src/pages/workflow/RoomBoard.tsx) và [thu tiền hiện tại](../src/booking/payment.tsx).
 - [Form tạo booking](../src/booking/BookingModal.tsx), [xem nhanh booking](../src/pages/rooms/BookingDetailModal.tsx) và [điều hướng](../src/nav.ts).
 - [Booking backend](../../backend/src/modules/booking/booking.controller.ts), [thông tin booking](../../backend/src/modules/booking/entities/booking.entity.ts), [chi tiết phòng/dịch vụ](../../backend/src/modules/booking/entities/booking-order-detail.entity.ts) và [quy tắc nhận phòng](../../backend/src/modules/booking/domain/checkin-time-policy.service.ts).
 - [Luồng booking dùng chung frontend](../../front-end-monorepo/packages/api/src/services/booking.ts) và [form đặt phòng web](../../front-end-monorepo/apps/web/src/components/booking-now/BookingNowForm.tsx).

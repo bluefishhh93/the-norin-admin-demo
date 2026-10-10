@@ -1,69 +1,146 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export const pageInfo: Record<string, [string, string, string]> = {
-  dashboard: ['Tổng quan', 'Tổng quan hoạt động', 'Theo dõi toàn bộ hoạt động kinh doanh trong một góc nhìn.'],
+  dashboard: [
+    'Tổng quan',
+    'Tổng quan hoạt động',
+    'Theo dõi toàn bộ hoạt động kinh doanh trong một góc nhìn.'
+  ],
   'work-queue': ['Cần xử lý', 'Việc cần xử lý', 'Các tín hiệu từ kiosk, tablet và camera.'],
-  cashier: ['Thu ngân', 'Thu ngân & tiền mặt', 'Theo dõi yêu cầu thu tại kiosk và đối soát cuối ca.'],
-  'booking-lookup': ['Booking', 'Quản lý booking', 'Danh sách, lịch đặt phòng và các thao tác theo lượt lưu trú.'],
-  'stay-orders': ['Đơn sản phẩm', 'Đơn sản phẩm', 'Chuẩn bị và giao sản phẩm đặt cùng booking hoặc gọi thêm.'],
-  bookings: ['Bảng phòng', 'Bảng phòng', 'Theo dõi phòng hiện tại, nhận khách và chuẩn bị lượt lưu trú tiếp theo.'],
+  cashier: [
+    'Thu ngân',
+    'Thu ngân & tiền mặt',
+    'Theo dõi yêu cầu thu tại kiosk và đối soát cuối ca.'
+  ],
+  'booking-lookup': [
+    'Booking',
+    'Quản lý booking',
+    'Danh sách, lịch đặt phòng và các thao tác theo lượt lưu trú.'
+  ],
+  'stay-orders': [
+    'Đơn sản phẩm',
+    'Đơn sản phẩm',
+    'Chuẩn bị và giao sản phẩm đặt cùng booking hoặc gọi thêm.'
+  ],
+  bookings: [
+    'Bảng phòng',
+    'Bảng phòng',
+    'Theo dõi phòng hiện tại, nhận khách và chuẩn bị lượt lưu trú tiếp theo.'
+  ],
   customers: ['Khách hàng', 'Khách hàng', 'Thông tin khách hàng từ các lượt đặt phòng.'],
   payments: ['Hóa đơn', 'Hóa đơn & folio', 'Tổng tiền, đã thu và còn nợ của từng lượt lưu trú.'],
-  reports: ['Báo cáo', 'Báo cáo thu tiền', 'Số tiền đã nhận theo từng ngày và phương thức thanh toán.'],
+  reports: [
+    'Báo cáo',
+    'Báo cáo thu tiền',
+    'Số tiền đã nhận theo từng ngày và phương thức thanh toán.'
+  ],
   pricing: ['Bảng giá', 'Bảng giá phòng', 'Giá theo giờ, qua đêm và theo ngày cho từng chi nhánh.'],
   vouchers: ['Voucher', 'Chương trình voucher', 'Tạo mã ưu đãi và theo dõi lượt sử dụng.'],
   products: ['Sản phẩm', 'Sản phẩm & dịch vụ', 'Danh mục hàng hóa và dịch vụ bán kèm.'],
-  inventory: ['Tồn kho', 'Tồn kho sản phẩm', 'Nhập hàng, xuất hủy và cảnh báo sắp hết.'],
-  'room-classes': ['Hạng phòng & phòng', 'Quản lý hạng phòng & phòng', 'Chọn hạng phòng, chọn phòng và cài đặt thông tin, nội dung 5 ngôn ngữ, nhạc, khóa, QR.'],
-  availability: ['Khóa bán phòng', 'Khóa bán phòng', 'Thiết lập khoảng thời gian ngừng bán hạng phòng.'],
+  'room-classes': [
+    'Hạng phòng & phòng',
+    'Quản lý hạng phòng & phòng',
+    'Chọn hạng phòng, chọn phòng và cài đặt thông tin, nội dung 5 ngôn ngữ, nhạc, khóa, QR.'
+  ],
+  availability: [
+    'Khóa bán phòng',
+    'Khóa bán phòng',
+    'Thiết lập khoảng thời gian ngừng bán hạng phòng.'
+  ],
   locks: ['TTLock mapping', 'Mapping khóa TTLock', 'Chọn phòng và khóa TTLock từ danh sách mẫu.'],
   'room-music': ['Nhạc tablet', 'Nhạc tablet theo phòng', 'Gán file MP3 cho từng Room ID.'],
   kiosks: ['Thiết bị kiosk', 'Thiết bị kiosk', 'Token, máy POS, kết nối agent và vật tư in/thẻ.'],
-  branches: ['Chi nhánh', 'Quản lý chi nhánh', 'Thông tin, tọa độ, tài khoản và thiết bị & kết nối của từng chi nhánh.'],
-  'branch-settings': ['Thông tin chi nhánh', 'Thông tin chi nhánh', 'Hotline, đặt online, vị trí QR phòng và kênh thông báo.'],
-  settings: ['Giờ & quy tắc', 'Giờ lưu trú & quy tắc vận hành', 'Thay cho cài đặt giờ của KiotViet; web, kiosk, tablet cùng dùng.'],
-  staff: ['Nhân sự & quyền', 'Nhân sự & phân quyền', 'Tài khoản, vai trò và chi nhánh của từng nhân sự.'],
+  branches: [
+    'Chi nhánh',
+    'Quản lý chi nhánh',
+    'Tạo chi nhánh, quản lý trạng thái và tài khoản quản lý; mở chi nhánh để cấu hình vận hành.'
+  ],
+  'branch-settings': [
+    'Thông tin chi nhánh',
+    'Thông tin chi nhánh',
+    'Hotline, đặt online, vị trí QR phòng và kênh thông báo.'
+  ],
+  staff: [
+    'Nhân sự & quyền',
+    'Nhân sự & phân quyền',
+    'Tài khoản, vai trò và chi nhánh của từng nhân sự.'
+  ],
   notifications: ['Thông báo', 'Nhật ký thông báo', 'Các sự kiện cần chuyển đến nhóm vận hành.']
 };
 
-export interface NavItem { page: string; icon: string; label: string; superOnly?: boolean; count?: boolean }
-export interface NavGroup { section?: string; items: NavItem[] }
+export interface NavItem {
+  page: string;
+  icon: string;
+  label: string;
+  count?: boolean;
+}
+export interface NavGroup {
+  section?: string;
+  items: NavItem[];
+}
 
 export const navGroups: NavGroup[] = [
+  {
+    items: [
+      { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan' },
+      { page: 'work-queue', icon: 'bi-inboxes', label: 'Cần xử lý' },
+      { page: 'cashier', icon: 'bi-cash-stack', label: 'Thu ngân & tiền mặt' },
+      { page: 'booking-lookup', icon: 'bi-calendar-check', label: 'Booking' },
+      { page: 'stay-orders', icon: 'bi-bag-check', label: 'Đơn sản phẩm' },
+      { page: 'bookings', icon: 'bi-calendar3', label: 'Bảng phòng', count: true },
+      { page: 'customers', icon: 'bi-people', label: 'Khách hàng' }
+    ]
+  },
+  {
+    section: 'KINH DOANH',
+    items: [
+      { page: 'payments', icon: 'bi-receipt', label: 'Hóa đơn' },
+      { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo' },
+      { page: 'pricing', icon: 'bi-tags', label: 'Bảng giá' },
+      { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher' },
+      { page: 'products', icon: 'bi-bag', label: 'Sản phẩm' }
+    ]
+  },
+  {
+    section: 'PHÒNG & THIẾT BỊ',
+    items: [
+      { page: 'room-classes', icon: 'bi-door-closed', label: 'Hạng phòng & phòng' },
+      { page: 'availability', icon: 'bi-slash-circle', label: 'Khóa bán phòng' },
+      { page: 'locks', icon: 'bi-key', label: 'TTLock mapping' },
+      { page: 'room-music', icon: 'bi-music-note-beamed', label: 'Nhạc tablet' },
+      { page: 'kiosks', icon: 'bi-display', label: 'Thiết bị kiosk' }
+    ]
+  },
+  {
+    section: 'QUẢN LÝ CHI NHÁNH',
+    items: [
+      { page: 'branches', icon: 'bi-buildings', label: 'Chi nhánh' },
+      { page: 'branch-settings', icon: 'bi-geo-alt', label: 'Thông tin chi nhánh' },
+      { page: 'staff', icon: 'bi-person-badge', label: 'Nhân sự & quyền' },
+      { page: 'notifications', icon: 'bi-bell', label: 'Nhật ký thông báo' }
+    ]
+  }
+];
+
+export const systemNavGroups: NavGroup[] = [
   { items: [
-    { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan' },
-    { page: 'work-queue', icon: 'bi-inboxes', label: 'Cần xử lý' },
-    { page: 'cashier', icon: 'bi-cash-stack', label: 'Thu ngân & tiền mặt' },
-    { page: 'booking-lookup', icon: 'bi-calendar-check', label: 'Booking' },
-    { page: 'stay-orders', icon: 'bi-bag-check', label: 'Đơn sản phẩm' },
-    { page: 'bookings', icon: 'bi-calendar3', label: 'Bảng phòng', count: true },
-    { page: 'customers', icon: 'bi-people', label: 'Khách hàng' }
-  ] },
-  { section: 'KINH DOANH', items: [
-    { page: 'payments', icon: 'bi-receipt', label: 'Hóa đơn' },
-    { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo' },
-    { page: 'pricing', icon: 'bi-tags', label: 'Bảng giá' },
-    { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher' },
-    { page: 'products', icon: 'bi-bag', label: 'Sản phẩm' },
-    { page: 'inventory', icon: 'bi-box-seam', label: 'Tồn kho' }
-  ] },
-  { section: 'PHÒNG & THIẾT BỊ', items: [
-    { page: 'room-classes', icon: 'bi-door-closed', label: 'Hạng phòng & phòng' },
-    { page: 'availability', icon: 'bi-slash-circle', label: 'Khóa bán phòng' },
-    { page: 'locks', icon: 'bi-key', label: 'TTLock mapping' },
-    { page: 'room-music', icon: 'bi-music-note-beamed', label: 'Nhạc tablet' },
-    { page: 'kiosks', icon: 'bi-display', label: 'Thiết bị kiosk', superOnly: true }
+    { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan hệ thống' },
+    { page: 'branches', icon: 'bi-buildings', label: 'Quản lý chi nhánh' },
+    { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo tổng hợp' }
   ] },
   { section: 'HỆ THỐNG', items: [
-    { page: 'branches', icon: 'bi-buildings', label: 'Chi nhánh', superOnly: true },
-    { page: 'branch-settings', icon: 'bi-geo-alt', label: 'Thông tin chi nhánh' },
-    { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc', superOnly: true },
-    { page: 'staff', icon: 'bi-person-badge', label: 'Nhân sự & quyền', superOnly: true },
-    { page: 'notifications', icon: 'bi-bell', label: 'Nhật ký thông báo', superOnly: true }
+    { page: 'staff', icon: 'bi-person-badge', label: 'Tài khoản hệ thống' }
   ] }
 ];
 
-const ALIASES: Record<string, string> = { calendar: 'booking-lookup', rooms: 'bookings', housekeeping: 'bookings', 'room-content': 'room-classes', integrations: 'branches', 'room-qr': 'branches' };
+const ALIASES: Record<string, string> = {
+  calendar: 'booking-lookup',
+  rooms: 'bookings',
+  housekeeping: 'bookings',
+  'room-content': 'room-classes',
+  integrations: 'branches',
+  'room-qr': 'branches'
+};
 const readHash = () => {
   const raw = location.hash.slice(1);
   const page = ALIASES[raw] ?? raw;

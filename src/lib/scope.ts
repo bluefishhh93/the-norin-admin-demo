@@ -1,18 +1,23 @@
 import type { DemoData } from '../types';
 
 type Scoped = { branchId: string };
+type Scope = Pick<DemoData, 'role' | 'branchId'>;
 
-export const SUPER_ONLY_PAGES = ['branches', 'kiosks', 'notifications', 'settings', 'staff'];
+export const SUPER_ONLY_PAGES = ['branches', 'settings'];
+export const SYSTEM_PAGES = ['dashboard', 'branches', 'reports', 'staff'];
+export const isSystemScope = (d: Scope) => d.role === 'superadmin' && d.branchId === 'all';
 
-export const isAllowedBranch = (d: Pick<DemoData, 'role'>, branchId: string) =>
-  d.role === 'superadmin' || branchId === 'sontra';
+export const isPageAllowed = (d: Scope, page: string) =>
+  isSystemScope(d) ? SYSTEM_PAGES.includes(page) : !SUPER_ONLY_PAGES.includes(page);
 
-export const scoped = <T extends Scoped>(d: Pick<DemoData, 'role' | 'branchId'>, items: T[]) =>
-  items.filter(item => (d.role === 'superadmin' || item.branchId === 'sontra') && (d.branchId === 'all' || item.branchId === d.branchId));
+export const isAllowedBranch = (d: Scope, branchId: string) =>
+  branchId !== 'all' && (isSystemScope(d) || branchId === d.branchId);
 
-export const scopedWithAll = <T extends Scoped>(d: Pick<DemoData, 'role' | 'branchId'>, items: T[]) =>
-  items.filter(item =>
-    (d.role === 'superadmin' || item.branchId === 'all' || item.branchId === 'sontra') &&
-    (d.branchId === 'all' || item.branchId === 'all' || item.branchId === d.branchId));
+export const scoped = <T extends Scoped>(d: Scope, items: T[]) =>
+  items.filter((item) => isAllowedBranch(d, item.branchId));
 
-export const defaultBranch = (d: Pick<DemoData, 'branchId'>) => d.branchId === 'all' ? 'sontra' : d.branchId;
+export const scopedWithAll = <T extends Scoped>(d: Scope, items: T[]) =>
+  items.filter((item) => item.branchId === 'all' || isAllowedBranch(d, item.branchId));
+
+export const defaultBranch = (d: Pick<DemoData, 'branchId'>) =>
+  d.branchId === 'all' ? 'sontra' : d.branchId;
