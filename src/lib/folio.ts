@@ -1,8 +1,6 @@
 import type { DemoData, Folio } from '../types';
-import { getRoomPrice } from './rooms';
-
 export const folioTotal = (b: Folio) =>
-  Math.max(0, b.orderDetails.reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0) - Number(b.voucherDiscount || 0));
+  b.status === 3 ? Math.max(0, folioPaid(b) - (b.cancellationRefund ?? 0)) : Math.max(0, b.orderDetails.filter(i => i.fulfillment !== 'cancelled').reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0) - Number(b.voucherDiscount || 0));
 export const folioPaid = (b: Folio) => b.payments.reduce((s, p) => s + Number(p.amount), 0);
 export const folioDue = (b: Folio) => Math.max(0, folioTotal(b) - folioPaid(b));
 export const isActive = (b: Folio) => b.status !== 3 && !b.actualCheckOutAt;
@@ -22,11 +20,4 @@ export const isOverstay = (d: DemoData, b: Folio) => {
 export const overstayType = (d: DemoData, b: Folio) => {
   const next = nextFolio(d, b);
   return !next || Date.parse(next.effectiveCheckInTime) - Date.now() >= 90 * 60000 ? 'EXTENDABLE' : 'BLOCKED';
-};
-
-export const extraHourFee = (d: DemoData, b: Folio) => {
-  const start = new Date(b.effectiveCheckInTime);
-  const two = getRoomPrice(d, b.branchId, b.room, 'Theo giờ', start, new Date(start.getTime() + 2 * 3600000));
-  const three = getRoomPrice(d, b.branchId, b.room, 'Theo giờ', start, new Date(start.getTime() + 3 * 3600000));
-  return two != null && three != null ? three - two : NaN;
 };

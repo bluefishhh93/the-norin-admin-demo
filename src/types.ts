@@ -1,6 +1,8 @@
 export type Role = 'superadmin' | 'branch_admin';
 export type RoomStatus = 'available' | 'occupied' | 'cleaning' | 'reserved';
-export type BookingStatus = 'confirmed' | 'checked-in' | 'checked-out' | 'pending';
+export type BookingStatus = 'confirmed' | 'checked-in' | 'checked-out' | 'pending' | 'cancelled' | 'no-show';
+export type PaymentTiming = 'prepaid' | 'postpaid';
+export interface BookingGuest { name: string; document: string }
 export type StayType = 'Theo giờ' | 'Qua đêm' | 'Theo ngày';
 export type PriceType = 'Ngày đêm' | 'Qua đêm' | 'Giờ';
 export type PayMethod = 'cash' | 'transfer' | 'card';
@@ -81,7 +83,9 @@ export interface RoomClass {
 
 export interface Season { branchId: string; category: string; type: PriceType; from: string; to: string; price: number }
 
-export interface OrderLine { name: string; productType: number; phase: 'booking' | 'stay'; quantity: number; price: number; fulfillment?: 'new' | 'preparing' | 'delivered' }
+export interface OrderLine { name: string; productId?: string; productType: number; phase: 'booking' | 'stay'; quantity: number; price: number; source?: string; orderedAt?: string; stockReserved?: boolean; fulfillment?: 'new' | 'preparing' | 'delivered' | 'cancelled' }
+export interface ProductSelection { productId: string; quantity: number }
+export interface AppliedVoucher { id: string; code: string; name: string; scope: 'ROOM_ONLY' | 'ENTIRE_BILL'; type: 'percent' | 'fixed'; value: number; base: number }
 export interface Payment { id: string; method: PayMethod; amount: number; createdAt: string; collector: string }
 export interface FlowEvent { at: string; text: string }
 
@@ -93,6 +97,9 @@ export interface Folio {
   checkinAdjustmentStatus: string | null; checkinAssistanceRequestedAt: string | null; checkoutRequestedAt: string | null;
   actualCheckOutAt: string | null; assistanceResolvedAt?: string; overstayHandledAt?: string; checkoutHandledAt?: string;
   orderDetails: OrderLine[]; voucherDiscount: number; payments: Payment[]; source: string; events: FlowEvent[];
+  paymentTiming?: PaymentTiming; outcome?: 'cancelled' | 'no-show'; note?: string;
+  guests?: BookingGuest[]; actualCheckInAt?: string; securityCode?: string;
+  voucher?: AppliedVoucher; cancellationRefund?: number; roomRate?: { room: string; start: string; end: string; amount: number };
 }
 
 export interface CashRequest { id: string; code: string; context: 'CHECKOUT' | 'BOOKING'; branchId: string; requestedAt: string; status: 'pending' | 'collected'; kiosk: string }

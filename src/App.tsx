@@ -10,7 +10,7 @@ import { branchName } from './lib/format';
 import { SUPER_ONLY_PAGES } from './lib/scope';
 import { pages } from './pages';
 
-const BOOKING_PAGES = new Set(['dashboard', 'bookings', 'calendar', 'booking-lookup', 'customers']);
+const BOOKING_PAGES = new Set(['dashboard', 'bookings', 'booking-lookup', 'customers']);
 
 export default function App() {
   const { data, update, toast, toastText, closeToast } = useStore();
@@ -37,7 +37,7 @@ export default function App() {
     : 'Chế độ Admin chi nhánh · chỉ xem dữ liệu The Norin Sơn Trà trong bản demo.';
 
   return (
-    <BookingProvider onCreated={() => navigate('bookings')}>
+    <BookingProvider onCreated={() => navigate('booking-lookup')}>
       <div className="app-shell">
         <Sidebar page={page} open={menuOpen} onNavigate={navigate} />
         <div className="main-wrap">

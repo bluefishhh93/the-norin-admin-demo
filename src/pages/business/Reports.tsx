@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { methodLabel, money } from '../../lib/format';
 import { scoped, scopedWithAll } from '../../lib/scope';
-import { folioDue } from '../../lib/folio';
+import { folioDue, folioTotal } from '../../lib/folio';
 import { DataTable, MetricCard, Panel, PanelHead, ScopeNote } from '../../components/ui';
 
 const Bar = ({ label, value, max, text }: { label: string; value: number; max: number; text: string }) => (
@@ -17,11 +17,13 @@ export function Reports() {
   const folios = scopedWithAll(data, data.folios);
   const payments = folios.flatMap(b => b.payments);
   const byMethod = (['cash', 'transfer', 'card'] as const).map(m => [methodLabel[m], payments.filter(p => p.method === m).reduce((s, p) => s + Number(p.amount), 0)] as const);
-  const lines = folios.flatMap(b => b.orderDetails);
+  const sales = folios.filter(b => b.status !== 3);
+  const lines = sales.flatMap(b => b.orderDetails).filter(i => i.fulfillment !== 'cancelled');
   const roomRev = lines.filter(i => i.productType === 6 && !/Phụ thu/.test(i.name)).reduce((s, i) => s + i.price * i.quantity, 0);
   const surcharge = lines.filter(i => /Phụ thu/.test(i.name)).reduce((s, i) => s + i.price * i.quantity, 0);
   const goods = lines.filter(i => i.productType !== 6).reduce((s, i) => s + i.price * i.quantity, 0);
-  const discount = folios.reduce((s, b) => s + Number(b.voucherDiscount || 0), 0);
+  const discount = sales.reduce((s, b) => s + Number(b.voucherDiscount || 0), 0);
+  const retained = folios.filter(b => b.status === 3).reduce((s, b) => s + folioTotal(b), 0);
   const byType = (['Theo giờ', 'Qua đêm', 'Theo ngày'] as const).map(t => [t, folios.filter(b => b.stayType === t).length] as const);
   const rooms = scoped(data, data.rooms);
   const occ = rooms.filter(r => r.status === 'occupied').length;
@@ -35,7 +37,7 @@ export function Reports() {
   return (
     <>
       <div className="metric-grid">
-        <MetricCard label="Doanh thu (sau giảm giá)" value={money(roomRev + surcharge + goods - discount)} foot={`Phòng ${money(roomRev)} · Dịch vụ ${money(goods)}`} />
+        <MetricCard label="Doanh thu (sau giảm giá)" value={money(roomRev + surcharge + goods - discount + retained)} foot={`Phòng ${money(roomRev)} · Dịch vụ ${money(goods)} · Giữ lại khi hủy ${money(retained)}`} />
         <MetricCard label="Đã thu" value={money(payments.reduce((s, p) => s + Number(p.amount), 0))} foot={`Còn nợ ${money(debt)}`} />
         <MetricCard label="Công suất hiện tại" value={`${rooms.length ? Math.round(occ / rooms.length * 100) : 0}%`} foot={`${occ}/${rooms.length} phòng có khách`} />
         <MetricCard label="Phụ thu quá giờ · Giảm giá" value={money(surcharge)} foot={`Voucher −${money(discount)}`} />
