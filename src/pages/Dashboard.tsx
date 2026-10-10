@@ -2,7 +2,8 @@ import type { Booking, Room } from '../types';
 import type { PageProps } from '.';
 import { useStore } from '../store';
 import { branchName, money, statusText } from '../lib/format';
-import { scoped } from '../lib/scope';
+import { scoped, isSystemScope } from '../lib/scope';
+import { folioPaid } from '../lib/folio';
 import { DataTable, MetricCard, PanelHead, Pill } from '../components/ui';
 
 export const Legend = () => (
@@ -79,7 +80,7 @@ const GoLink = ({ label, onClick }: { label: string; onClick: () => void }) => (
 );
 
 export function Dashboard({ navigate }: PageProps) {
-  const { data } = useStore();
+  const { data, update } = useStore();
   const rooms = scoped(data, data.rooms);
   const bookings = scoped(data, data.bookings);
   const occupied = rooms.filter((r) => r.status === 'occupied').length;
@@ -127,6 +128,24 @@ export function Dashboard({ navigate }: PageProps) {
   ]
     .filter((a) => all || a.branchId === data.branchId)
     .slice(0, 5);
+
+  if (isSystemScope(data)) return <>
+    <div className="metric-grid">
+      <MetricCard label="Chi nhánh hoạt động" value={data.branches.filter(b => b.active !== false).length} foot="Trên toàn hệ thống" />
+      <MetricCard label="Đã thu ròng" value={money(data.folios.reduce((s, f) => s + folioPaid(f), 0))} foot="Tổng thu trừ các khoản hoàn" />
+      <MetricCard label="Công suất hiện tại" value={`${rooms.length ? Math.round(occupied / rooms.length * 100) : 0}%`} foot={`${occupied}/${rooms.length} phòng có khách`} />
+    </div>
+    <section className="panel table-panel">
+      <PanelHead title="Các chi nhánh" subtitle="Mở chi nhánh để quản lý booking, kinh doanh và thiết bị" action={<GoLink label="Quản lý chi nhánh" onClick={() => navigate('branches')} />} />
+      <DataTable headers={['CHI NHÁNH', 'TRẠNG THÁI', 'PHÒNG CÓ KHÁCH', 'ĐÃ THU RÒNG', 'THAO TÁC']}>
+        {data.branches.map(b => {
+          const branchRooms = data.rooms.filter(r => r.branchId === b.id);
+          const paid = data.folios.filter(f => f.branchId === b.id).reduce((s, f) => s + folioPaid(f), 0);
+          return <tr key={b.id}><td><strong>{b.name}</strong><small>{b.address}</small></td><td>{b.active === false ? 'Dừng hoạt động' : 'Hoạt động'}</td><td>{branchRooms.filter(r => r.status === 'occupied').length}/{branchRooms.length}</td><td>{money(paid)}</td><td><GoLink label="Quản lý chi nhánh" onClick={() => { update(d => { d.branchId = b.id; }); navigate('dashboard'); }} /></td></tr>;
+        })}
+      </DataTable>
+    </section>
+  </>;
 
   return (
     <>

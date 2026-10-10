@@ -34,7 +34,7 @@ export function Pricing() {
   const seasons = scoped(data, activeSeasons(data)).sort((a, b) => a.from.localeCompare(b.from));
   const today = dayKeyOf(new Date());
   const branchOpts = (
-    data.role === 'superadmin' ? data.branches : data.branches.filter((b) => b.id === 'sontra')
+    data.branches.filter((b) => isAllowedBranch(data, b.id))
   ).map((b) => [b.id, b.name] as [string, string]);
 
   const editRate = (room: Room) => {

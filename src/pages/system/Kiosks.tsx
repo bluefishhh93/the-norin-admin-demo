@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName } from '../../lib/format';
-import { defaultBranch, scopedWithAll } from '../../lib/scope';
+import { defaultBranch, scopedWithAll, isAllowedBranch } from '../../lib/scope';
 import {
   DataTable,
   Panel,
@@ -26,13 +26,13 @@ const Level = ({ value, low }: { value: number; low: number }) => (
 export function Kiosks() {
   const { data, update, toast } = useStore();
   const modal = useModal();
-  const allowed = (id: string) => data.role === 'superadmin' || id === 'sontra' || id === 'all';
+  const allowed = (id: string) => isAllowedBranch(data, id);
   const list = scopedWithAll(data, data.kiosks);
   const warn = list.filter(
     (k) => !k.agentOnline || k.paper <= 20 || k.cards <= 10 || k.returnBin >= 15
   );
   const branchOptions: [string, string][] = (
-    data.role === 'superadmin' ? data.branches : data.branches.filter((b) => b.id === 'sontra')
+    data.branches.filter((b) => allowed(b.id))
   ).map((b) => [b.id, b.name]);
 
   const showToken = (text: string, token: string) =>

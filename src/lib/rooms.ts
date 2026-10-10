@@ -1,3 +1,4 @@
+import { isAllowedBranch } from './scope';
 import type { Booking, DemoData, PriceType, Room, RoomPrice, Season, StayType } from '../types';
 
 export const ACTIVE_BOOKING = ['confirmed', 'checked-in', 'pending'];
@@ -67,7 +68,7 @@ export const checkRoomInterval = (
   allowPast = false,
   validateDuration = true
 ): true | string => {
-  if (!room || (d.role !== 'superadmin' && room.branchId !== 'sontra'))
+  if (!room || !isAllowedBranch(d, room.branchId))
     return 'Phòng không khả dụng.';
   if (
     !Number.isFinite(start.getTime()) ||

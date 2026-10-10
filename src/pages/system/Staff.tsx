@@ -3,14 +3,14 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName } from '../../lib/format';
-import { defaultBranch, scopedWithAll } from '../../lib/scope';
+import { defaultBranch, scoped, isSystemScope, isAllowedBranch } from '../../lib/scope';
 import { DataTable, Panel, Pill, PrimaryButton, TextLink, Toolbar } from '../../components/ui';
 
 const ROLES: Record<string, [string, string]> = {
-  superadmin: ['Superadmin', 'Toàn quyền mọi chi nhánh, cấu hình hệ thống, kiosk, nhân sự'],
+  superadmin: ['Superadmin', 'Quản lý hệ thống, chi nhánh, tài khoản hệ thống; mở từng chi nhánh để quản lý vận hành'],
   manager: [
     'Quản lý chi nhánh',
-    'Giá, phòng, sản phẩm, voucher, báo cáo, sổ quỹ, kết ca của chi nhánh'
+    'Booking, giá, phòng, sản phẩm, tồn kho, voucher, báo cáo, thiết bị và nhân sự của chi nhánh'
   ],
   reception: ['Lễ tân', 'Đặt phòng, nhận/trả phòng, thu tiền, xử lý hàng việc, đơn gọi thêm'],
   housekeeping: ['Buồng phòng', 'Xem phòng chờ dọn, xác nhận đã dọn'],
@@ -20,18 +20,14 @@ const ROLES: Record<string, [string, string]> = {
 export function Staff() {
   const { data, update, toast } = useStore();
   const modal = useModal();
-  const isSuper = data.role === 'superadmin';
-  const allowed = (id: string) => isSuper || id === 'sontra' || id === 'all';
-  const list = scopedWithAll(data, data.staff);
-  const roleOptions: [string, string][] = Object.entries(ROLES)
-    .filter(([k]) => isSuper || k !== 'superadmin')
-    .map(([k, [n]]) => [k, n]);
-  const branchOptions: [string, string][] = [
-    ...(isSuper ? [['all', 'Toàn hệ thống'] as [string, string]] : []),
-    ...(isSuper ? data.branches : data.branches.filter((b) => b.id === 'sontra')).map(
-      (b) => [b.id, b.name] as [string, string]
-    )
-  ];
+  const systemScope = isSystemScope(data);
+  const allowed = (id: string) => systemScope ? id === 'all' : isAllowedBranch(data, id);
+  const list = systemScope ? data.staff.filter(u => u.branchId === 'all') : scoped(data, data.staff).filter(u => u.role !== 'superadmin');
+  const roles = Object.entries(ROLES).filter(([k]) => systemScope ? k === 'superadmin' || k === 'voucher_staff' : k !== 'superadmin');
+  const roleOptions: [string, string][] = roles.map(([k, [n]]) => [k, n]);
+  const branchOptions: [string, string][] = systemScope
+    ? [['all', 'Toàn hệ thống']]
+    : data.branches.filter(b => isAllowedBranch(data, b.id)).map(b => [b.id, b.name]);
 
   const openForm = (u?: StaffUser) =>
     modal.openForm({
@@ -64,7 +60,7 @@ export function Staff() {
               label="Vai trò"
               name="role"
               options={roleOptions}
-              defaultValue={u?.role ?? 'reception'}
+              defaultValue={u?.role ?? (systemScope ? 'superadmin' : 'reception')}
             />
           </div>
           <div className="col-sm-6">
@@ -72,7 +68,7 @@ export function Staff() {
               label="Chi nhánh"
               name="branchId"
               options={branchOptions}
-              defaultValue={u?.branchId ?? defaultBranch(data)}
+              defaultValue={u?.branchId ?? (systemScope ? 'all' : defaultBranch(data))}
             />
           </div>
           {!u && (
@@ -91,7 +87,7 @@ export function Staff() {
       ),
       onSubmit: (v) => {
         const invalid =
-          !allowed(v.branchId) ||
+          !allowed(v.branchId) || !roleOptions.some(([role]) => role === v.role) ||
           (v.role !== 'superadmin' && v.role !== 'voucher_staff' && v.branchId === 'all') ||
           data.staff.some((x) => x.id !== u?.id && x.username === v.username);
         if (invalid) {
@@ -161,7 +157,7 @@ export function Staff() {
       </Panel>
       <Panel title="Vai trò" subtitle="Quyền mặc định của từng vai trò">
         <DataTable headers={['VAI TRÒ', 'ĐƯỢC LÀM']}>
-          {Object.entries(ROLES).map(([k, [n, d]]) => (
+          {roles.map(([k, [n, d]]) => (
             <tr key={k}>
               <td>
                 <strong>{n}</strong>

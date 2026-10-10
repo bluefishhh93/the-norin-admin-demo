@@ -4,16 +4,16 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { ttlockCatalog } from '../../seed/operations';
 import { branchName } from '../../lib/format';
-import { defaultBranch, scopedWithAll } from '../../lib/scope';
+import { defaultBranch, scopedWithAll, isAllowedBranch } from '../../lib/scope';
 import { DataTable, Panel, PrimaryButton, ScopeNote, TextLink, Toolbar } from '../../components/ui';
 
 function LockFields({ lock }: { lock?: Lock }) {
   const { data } = useStore();
   const allowed =
-    data.role === 'superadmin' ? data.branches : data.branches.filter((b) => b.id === 'sontra');
+    data.branches.filter((b) => isAllowedBranch(data, b.id));
   const [branchId, setBranchId] = useState(lock?.branchId ?? defaultBranch(data));
   const rooms = data.rooms.filter(
-    (r) => (data.role === 'superadmin' || r.branchId === 'sontra') && r.branchId === branchId
+    (r) => isAllowedBranch(data, r.branchId) && r.branchId === branchId
   );
   const [room, setRoom] = useState(lock?.room ?? rooms[0]?.number ?? '');
   const roomValue = rooms.some((r) => r.number === room) ? room : (rooms[0]?.number ?? '');
@@ -90,7 +90,7 @@ export function Locks() {
       title: lock ? 'Sửa mapping TTLock' : 'Thêm mapping TTLock',
       body: <LockFields lock={lock} />,
       onSubmit: (v) => {
-        if (data.role !== 'superadmin' && v.branchId !== 'sontra') return false;
+        if (!isAllowedBranch(data, v.branchId)) return false;
         const room = data.rooms.find((r) => r.branchId === v.branchId && r.number === v.room);
         const masterProductId = room?.masterProductId;
         if (!masterProductId || masterProductId !== +v.masterProductId) {

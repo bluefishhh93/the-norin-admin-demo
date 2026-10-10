@@ -8,12 +8,40 @@ import { branchName } from '../src/lib/format';
 import { migrateClassReferences } from '../src/lib/migrations';
 import { checkRoomInterval, getRoomPrice, roomBusy, roomRate } from '../src/lib/rooms';
 import { blockReason } from '../src/pages/rooms/timeline';
+import { isAllowedBranch, isPageAllowed, scoped, scopedWithAll } from '../src/lib/scope';
 
 const fixture = () => {
   const data = createSeed();
   normalizeBookings(data);
   return data;
 };
+
+test('system and branch workspaces expose only their pages and data', () => {
+  const data = fixture();
+  data.role = 'superadmin';
+  data.branchId = 'all';
+  assert.equal(isPageAllowed(data, 'branches'), true);
+  assert.equal(isPageAllowed(data, 'settings'), true);
+  assert.equal(isPageAllowed(data, 'booking-lookup'), false);
+  assert.equal(isPageAllowed(data, 'kiosks'), false);
+  assert.equal(scoped(data, data.rooms).length, data.rooms.length);
+
+  for (const role of ['superadmin', 'branch_admin'] as const) {
+    data.role = role;
+    data.branchId = 'mykhe';
+    assert.equal(isPageAllowed(data, 'branches'), false);
+    assert.equal(isPageAllowed(data, 'settings'), false);
+    assert.equal(isPageAllowed(data, 'booking-lookup'), true);
+    assert.equal(isPageAllowed(data, 'kiosks'), true);
+    assert.equal(isPageAllowed(data, 'staff'), true);
+    assert.equal(isAllowedBranch(data, 'mykhe'), true);
+    assert.equal(isAllowedBranch(data, 'sontra'), false);
+    assert.equal(scoped(data, data.rooms).every(r => r.branchId === 'mykhe'), true);
+    assert.equal(scopedWithAll(data, data.vouchers).every(v => ['all', 'mykhe'].includes(v.branchId)), true);
+    const foreignRoom = data.rooms.find(r => r.branchId === 'sontra')!;
+    assert.equal(checkRoomInterval(data, foreignRoom, new Date('2030-10-12T08:00'), new Date('2030-10-12T10:00'), 'Theo giờ'), 'Phòng không khả dụng.');
+  }
+});
 
 test('class-name snapshots migrate to IDs and survive renaming', () => {
   const data = fixture();

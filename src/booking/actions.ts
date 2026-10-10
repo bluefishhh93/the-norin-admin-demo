@@ -1,5 +1,6 @@
 import type { DemoData, Folio, PayMethod } from '../types';
 import { useStore } from '../store';
+import { isAllowedBranch } from '../lib/scope';
 import { checkRoomInterval } from '../lib/rooms';
 import { cameraOf, checkoutAt, folioDue, folioPaid, isActive } from '../lib/folio';
 import { fmtDateTime, money } from '../lib/format';
@@ -44,7 +45,7 @@ export function useBookingActions() {
   const change = (code: string, apply: (d: DemoData, f: Folio) => void) =>
     update((d) => {
       const f = d.folios.find((b) => b.code === code);
-      if (!f || (d.role !== 'superadmin' && f.branchId !== 'sontra')) return;
+      if (!f || !isAllowedBranch(d, f.branchId)) return;
       apply(d, f);
     });
   const find = (code: string) => data.folios.find((f) => f.code === code)!;
@@ -277,7 +278,7 @@ export function useBookingActions() {
     },
     refund: (code: string, method: PayMethod, reason: string): string | null => {
       const f = find(code);
-      if (data.role !== 'superadmin') return 'Chỉ Superadmin có quyền hoàn tiền trong demo.';
+      if (!isAllowedBranch(data, f.branchId)) return 'Booking không thuộc chi nhánh đang quản lý.';
       if (!reason.trim() || !refundable(f)) return 'Nhập lý do và kiểm tra số tiền được hoàn.';
       change(code, (d, b) => {
         recordPayment(d, b, -refundable(b), method, reason);

@@ -10,6 +10,7 @@ import './booking.css';
 import { ProductPicker } from './ProductPicker';
 import { quoteVoucher } from './voucher';
 import { saleProducts } from './products';
+import { isAllowedBranch } from '../lib/scope';
 
 export function BookingModal({
   open,
@@ -23,7 +24,7 @@ export function BookingModal({
   onCreated: (code: string, receiveNow: boolean) => void;
 }) {
   const { data, update, toast } = useStore();
-  const allowed = data.branches.filter((b) => data.role === 'superadmin' || b.id === 'sontra');
+  const allowed = data.branches.filter((b) => isAllowedBranch(data, b.id));
   const initialStart = preset.start ?? new Date(Math.ceil(Date.now() / 1800000) * 1800000);
   const initialType = preset.type ?? 'Theo giờ';
   const initialRange =

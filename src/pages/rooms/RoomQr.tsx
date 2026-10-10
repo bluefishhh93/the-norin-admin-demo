@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../../store';
+import { isSystemScope } from '../../lib/scope';
 import { createRoomQrDataUrl, downloadRoomQrPdf, roomQrUrl } from '../../lib/roomQr';
 
 export const QrImage = memo(function QrImage({
@@ -92,6 +93,8 @@ export function QrDomainInput() {
       );
     }
   };
+
+  if (!isSystemScope(data)) return <p className="small text-muted mb-0">Tên miền QR chung: {data.qrDomain || 'Chưa cấu hình'}. Cấu hình tại Giờ & quy tắc chung của hệ thống.</p>;
 
   return (
     <div className="qr-domain">

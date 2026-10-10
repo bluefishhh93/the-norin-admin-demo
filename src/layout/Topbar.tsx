@@ -1,4 +1,5 @@
 import { useStore } from '../store';
+import { branchName } from '../lib/format';
 
 export function Topbar({
   label,
@@ -29,7 +30,7 @@ export function Topbar({
         <div className="avatar">{isSuper ? 'NA' : 'LM'}</div>
         <div className="profile-text">
           <strong>{isSuper ? 'Nguyễn Anh' : 'Lê Minh'}</strong>
-          <span>{isSuper ? 'Superadmin' : 'Admin · Sơn Trà'}</span>
+          <span>{isSuper ? 'Superadmin' : `Admin · ${branchName(data, data.branchId)}`}</span>
         </div>
         <i className="bi bi-chevron-down profile-chevron" />
         <button

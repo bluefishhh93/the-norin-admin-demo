@@ -2,12 +2,16 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName } from '../../lib/format';
+import { isAllowedBranch } from '../../lib/scope';
+import { BranchDevices, readIntegrations } from '../branches/BranchDevices';
+import { BranchQr } from '../rooms/RoomQr';
+import type { PageProps } from '../index';
 import { DataTable, Panel, Pill, TextLink } from '../../components/ui';
 
-export function BranchSettings() {
+export function BranchSettings({ navigate }: PageProps) {
   const { data, update, toast } = useStore();
   const modal = useModal();
-  const allowed = (id: string) => data.role === 'superadmin' || id === 'sontra';
+  const allowed = (id: string) => isAllowedBranch(data, id);
   const list = data.branches.filter(
     (b) => allowed(b.id) && (data.branchId === 'all' || b.id === data.branchId)
   );
@@ -114,6 +118,21 @@ export function BranchSettings() {
     });
   };
 
+  const devices = (id: string) => {
+    const branch = data.branches.find(b => b.id === id)!;
+    modal.openForm({
+      title: `Thiết bị & kết nối · ${branch.name}`, size: 'lg', submitLabel: 'Lưu cài đặt',
+      body: <BranchDevices branch={branch} info={data.branchInfo[id]} kiosks={data.kiosks.filter(k => k.branchId === id)} onKiosks={() => { modal.close(); navigate('kiosks'); }} />,
+      onSubmit: v => {
+        update(d => {
+          d.branches.find(b => b.id === id)!.integrations = readIntegrations(v);
+          Object.assign(d.branchInfo[id], { hichatUrl: v.hichatUrl.trim(), hichatToken: v.hichatToken.trim() });
+        });
+        toast('Đã lưu kết nối của chi nhánh.');
+      }
+    });
+  };
+
   return (
     <Panel
       title="Thông tin chi nhánh"
@@ -161,7 +180,7 @@ export function BranchSettings() {
                 )}
               </td>
               <td>
-                <TextLink onClick={() => edit(b.id)}>Sửa</TextLink>
+                <div className="d-flex gap-2 flex-wrap"><TextLink onClick={() => edit(b.id)}>Sửa thông tin</TextLink><TextLink onClick={() => devices(b.id)}>Thiết bị & kết nối</TextLink><TextLink onClick={() => modal.openInfo({ title: `QR phòng · ${b.name}`, size: 'lg', body: <BranchQr branchId={b.id} /> })}>QR phòng</TextLink></div>
               </td>
             </tr>
           );

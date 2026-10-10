@@ -5,8 +5,6 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Pill, PrimaryButton, Toolbar } from '../../components/ui';
 import { BranchForm } from './BranchForm';
-import { BranchDevices, integrationCount, readIntegrations } from './BranchDevices';
-import { BranchQr } from '../rooms/RoomQr';
 
 const slug = (s: string) =>
   s
@@ -142,46 +140,6 @@ export function Branches({ navigate }: PageProps) {
       }
     });
 
-  const devices = (b: Branch) =>
-    modal.openForm({
-      title: `Thiết bị & kết nối · ${b.name}`,
-      size: 'lg',
-      submitLabel: 'Lưu cài đặt',
-      body: (
-        <BranchDevices
-          branch={b}
-          info={data.branchInfo[b.id]}
-          kiosks={data.kiosks.filter((k) => k.branchId === b.id)}
-          onKiosks={() => {
-            modal.close();
-            update((d) => {
-              d.branchId = b.id;
-            });
-            navigate('kiosks');
-          }}
-        />
-      ),
-      onSubmit: (v) => {
-        update((d) => {
-          const t = d.branches.find((x) => x.id === b.id);
-          if (t) t.integrations = readIntegrations(v);
-          if (d.branchInfo[b.id])
-            Object.assign(d.branchInfo[b.id], {
-              hichatUrl: v.hichatUrl.trim(),
-              hichatToken: v.hichatToken.trim()
-            });
-        });
-        toast(`Đã lưu thiết bị & kết nối cho ${b.name}.`);
-      }
-    });
-
-  const qr = (b: Branch) =>
-    modal.openInfo({
-      title: `QR phòng · ${b.name}`,
-      size: 'lg',
-      body: <BranchQr branchId={b.id} />
-    });
-
   const setActive = (b: Branch, value: boolean) => {
     update((d) => {
       const t = d.branches.find((x) => x.id === b.id);
@@ -221,13 +179,6 @@ export function Branches({ navigate }: PageProps) {
       <div className="page-grid">
         {data.branches.map((b) => {
           const info = data.branchInfo[b.id];
-          const connected = integrationCount(b, info);
-          const kioskCount = data.kiosks.filter((k) => k.branchId === b.id).length;
-          const qrCount = new Set(
-            data.rooms
-              .filter((r) => r.branchId === b.id && Number(r.masterProductId) > 0)
-              .map((r) => r.masterProductId)
-          ).size;
           const active = b.active ?? true;
           return (
             <article className={`card branch-card${active ? '' : ' inactive'}`} key={b.id}>
@@ -283,27 +234,6 @@ export function Branches({ navigate }: PageProps) {
                 </div>
               </dl>
               <AccountRow branch={b} />
-              <div className="branch-links">
-                <button type="button" className="branch-devices" onClick={() => devices(b)}>
-                  <i className="bi bi-plug" />
-                  <span>
-                    <strong>Thiết bị & kết nối</strong>
-                    <small>
-                      {connected ? `${connected} kết nối đang bật` : 'Chưa cấu hình'} · {kioskCount}{' '}
-                      kiosk
-                    </small>
-                  </span>
-                  <i className="bi bi-chevron-right" />
-                </button>
-                <button type="button" className="branch-devices" onClick={() => qr(b)}>
-                  <i className="bi bi-qr-code" />
-                  <span>
-                    <strong>QR phòng</strong>
-                    <small>{qrCount} phòng có Room ID</small>
-                  </span>
-                  <i className="bi bi-chevron-right" />
-                </button>
-              </div>
               <div className="branch-card-actions">
                 <button
                   className="text-link"
@@ -315,7 +245,7 @@ export function Branches({ navigate }: PageProps) {
                     navigate('dashboard');
                   }}
                 >
-                  Xem chi nhánh <i className="bi bi-arrow-right" />
+                  Quản lý chi nhánh <i className="bi bi-arrow-right" />
                 </button>
                 <button
                   className={`text-link ${active ? 'danger' : ''}`}

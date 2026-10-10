@@ -54,7 +54,7 @@ export const pageInfo: Record<string, [string, string, string]> = {
   branches: [
     'Chi nhánh',
     'Quản lý chi nhánh',
-    'Thông tin, tọa độ, tài khoản và thiết bị & kết nối của từng chi nhánh.'
+    'Tạo chi nhánh, quản lý trạng thái và tài khoản quản lý; mở chi nhánh để cấu hình vận hành.'
   ],
   'branch-settings': [
     'Thông tin chi nhánh',
@@ -78,7 +78,6 @@ export interface NavItem {
   page: string;
   icon: string;
   label: string;
-  superOnly?: boolean;
   count?: boolean;
 }
 export interface NavGroup {
@@ -116,19 +115,32 @@ export const navGroups: NavGroup[] = [
       { page: 'availability', icon: 'bi-slash-circle', label: 'Khóa bán phòng' },
       { page: 'locks', icon: 'bi-key', label: 'TTLock mapping' },
       { page: 'room-music', icon: 'bi-music-note-beamed', label: 'Nhạc tablet' },
-      { page: 'kiosks', icon: 'bi-display', label: 'Thiết bị kiosk', superOnly: true }
+      { page: 'kiosks', icon: 'bi-display', label: 'Thiết bị kiosk' }
     ]
   },
   {
-    section: 'HỆ THỐNG',
+    section: 'QUẢN LÝ CHI NHÁNH',
     items: [
-      { page: 'branches', icon: 'bi-buildings', label: 'Chi nhánh', superOnly: true },
+      { page: 'branches', icon: 'bi-buildings', label: 'Chi nhánh' },
       { page: 'branch-settings', icon: 'bi-geo-alt', label: 'Thông tin chi nhánh' },
-      { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc', superOnly: true },
-      { page: 'staff', icon: 'bi-person-badge', label: 'Nhân sự & quyền', superOnly: true },
-      { page: 'notifications', icon: 'bi-bell', label: 'Nhật ký thông báo', superOnly: true }
+      { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc' },
+      { page: 'staff', icon: 'bi-person-badge', label: 'Nhân sự & quyền' },
+      { page: 'notifications', icon: 'bi-bell', label: 'Nhật ký thông báo' }
     ]
   }
+];
+
+export const systemNavGroups: NavGroup[] = [
+  { items: [
+    { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan hệ thống' },
+    { page: 'branches', icon: 'bi-buildings', label: 'Quản lý chi nhánh' },
+    { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo tổng hợp' },
+    { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher toàn hệ thống' }
+  ] },
+  { section: 'HỆ THỐNG', items: [
+    { page: 'staff', icon: 'bi-person-badge', label: 'Tài khoản hệ thống' },
+    { page: 'settings', icon: 'bi-clock-history', label: 'Giờ & quy tắc chung' }
+  ] }
 ];
 
 const ALIASES: Record<string, string> = {

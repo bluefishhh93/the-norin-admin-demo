@@ -1,5 +1,6 @@
 import type { DemoData, Folio } from '../../types';
 import { useStore } from '../../store';
+import { isAllowedBranch } from '../../lib/scope';
 import { fmtDateTime } from '../../lib/format';
 import { recordEvent } from '../../booking/model';
 
@@ -37,7 +38,7 @@ export function useFlowActions() {
       const room = data.rooms.find(
         (r) =>
           `${r.branchId}:${r.number}` === key &&
-          (data.role === 'superadmin' || r.branchId === 'sontra')
+          isAllowedBranch(data, r.branchId)
       );
       if (!room || room.status !== 'cleaning') return;
       if (room.cleaningReadyAt && Date.now() < Date.parse(room.cleaningReadyAt)) {

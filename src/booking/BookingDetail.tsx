@@ -93,7 +93,7 @@ export function BookingDetail({ b }: { b: Folio }) {
               Thu tiền
             </button>
           )}
-          {refund > 0 && data.role === 'superadmin' && (
+          {refund > 0 && (
             <button className="btn btn-outline-warning" onClick={() => open('refund')}>
               Hoàn tiền
             </button>
@@ -174,7 +174,7 @@ export function BookingDetail({ b }: { b: Folio }) {
                     ? `Hiệu lực đến ${fmtDateTime(checkoutAt(b))}`
                     : 'Chưa có quyền đang sử dụng'}
                 </span>
-                {data.role === 'superadmin' && b.securityCode && (
+                {b.securityCode && (
                   <button
                     className="btn btn-link p-0 text-start"
                     onClick={() => setShowSecret((v) => !v)}

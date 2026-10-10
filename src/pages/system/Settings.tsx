@@ -4,6 +4,7 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { DataTable, Panel, PrimaryButton, Toolbar } from '../../components/ui';
+import { QrDomainInput } from '../rooms/RoomQr';
 
 const RULE_ROWS: [Exclude<keyof Rules, 'checkinMode'>, string, string][] = [
   ['reservationHold', 'Giữ chỗ chờ thanh toán', 'phút'],
@@ -230,6 +231,7 @@ export function Settings() {
           </PrimaryButton>
         </div>
       </Toolbar>
+      <Panel title="Tên miền QR chung" subtitle="Áp dụng cho QR phòng của toàn hệ thống"><QrDomainInput /></Panel>
       <div className="pms-cards">
         <Card icon="bi-sun" title="Theo ngày">
           <Row label="Nhận phòng" value={s.dayCheckIn} />

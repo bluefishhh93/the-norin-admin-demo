@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName, money } from '../../lib/format';
-import { scopedWithAll } from '../../lib/scope';
+import { scopedWithAll, isAllowedBranch, isSystemScope } from '../../lib/scope';
 import { DataTable, Panel, PrimaryButton, ScopeNote, TextLink, Toolbar } from '../../components/ui';
 
 const WEEKDAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -25,8 +25,8 @@ const voucherStatus = (v: Voucher) => {
 export function Vouchers() {
   const { data, update, toast } = useStore();
   const modal = useModal();
-  const isSuper = data.role === 'superadmin';
-  const list = scopedWithAll(data, data.vouchers);
+  const systemScope = isSystemScope(data);
+  const list = systemScope ? data.vouchers.filter(v => v.branchId === 'all') : scopedWithAll(data, data.vouchers);
 
   const showCodes = (v: Voucher) =>
     modal.openInfo({
@@ -47,9 +47,9 @@ export function Vouchers() {
     });
 
   const openForm = (voucher?: Voucher) => {
-    const branchOpts: [string, string][] = isSuper
-      ? [['all', 'Toàn hệ thống'], ...data.branches.map((b) => [b.id, b.name] as [string, string])]
-      : [['sontra', branchName(data, 'sontra')]];
+    const branchOpts: [string, string][] = systemScope ? [['all', 'Toàn hệ thống']] : data.branches
+      .filter(b => isAllowedBranch(data, b.id))
+      .map(b => [b.id, b.name]);
     const selectedDays = voucher?.weekdays ?? [1, 2, 3, 4, 5, 6, 7];
     modal.openForm({
       title: voucher ? 'Sửa voucher' : 'Tạo voucher',
@@ -161,7 +161,7 @@ export function Vouchers() {
           ...form.querySelectorAll<HTMLInputElement>('input[name="weekdays"]:checked')
         ].map((i) => Number(i.value));
         const code = v.code.trim().toUpperCase();
-        if (!isSuper && v.branchId !== 'sontra') return false;
+        if (systemScope ? v.branchId !== 'all' : !isAllowedBranch(data, v.branchId)) return false;
         if (
           !weekdays.length ||
           v.ends < v.starts ||
@@ -255,7 +255,7 @@ export function Vouchers() {
               </td>
               <td>{voucherStatus(v)}</td>
               <td>
-                {v.branchId === 'all' && !isSuper ? (
+                {v.branchId === 'all' && !systemScope ? (
                   'Chỉ xem'
                 ) : (
                   <>

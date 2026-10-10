@@ -118,7 +118,7 @@ export function Products() {
           else
             d.products.push({
               id: `SP-${Date.now()}`,
-              branchId: d.role === 'superadmin' ? defaultBranch(d) : 'sontra',
+              branchId: defaultBranch(d),
               ...fields
             });
         });
