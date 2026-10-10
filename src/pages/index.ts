@@ -2,7 +2,6 @@ import type { ComponentType } from 'react';
 import { Dashboard } from './Dashboard';
 import { Customers } from './Customers';
 import { Branches } from './Branches';
-import { Calendar } from './Calendar';
 import { WorkQueue } from './workflow/WorkQueue';
 import { Cashier } from './workflow/Cashier';
 import { BookingLookup } from './workflow/BookingLookup';
@@ -32,7 +31,6 @@ export const pages: Record<string, ComponentType<PageProps>> = {
   'booking-lookup': BookingLookup,
   'stay-orders': StayOrders,
   bookings: Bookings,
-  calendar: Calendar,
   customers: Customers,
   payments: Payments,
   reports: Reports,

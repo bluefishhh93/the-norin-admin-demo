@@ -35,7 +35,7 @@ export function WorkQueue() {
         detail: `Quá ${Math.floor((Date.now() - Date.parse(checkoutAt(b))) / 60000)} phút · camera còn khách`,
         action: blocked
           ? <TextLink icon="bi-arrow-right" onClick={() => act.resolveOverstay(b.code)}>Đã lên phòng xử lý</TextLink>
-          : <TextLink icon="bi-plus-circle" onClick={() => act.extendHour(b.code)}>Cộng 1 tiếng vào folio</TextLink>
+          : <TextLink icon="bi-plus-circle" onClick={() => detail(b)}>Kiểm tra & gia hạn</TextLink>
       };
     }),
     ...list.filter(b => b.checkoutRequestedAt && !b.checkoutHandledAt).map(b => ({
@@ -46,7 +46,7 @@ export function WorkQueue() {
     ...list.filter(b => b.detailStatus === 2 && folioDue(b) === 0 && !b.actualCheckOutAt && requests.some(r => r.code === b.code && r.context === 'CHECKOUT' && r.status === 'collected')).map(b => ({
       key: `done-${b.code}`, code: b.code, room: b.room, branchId: b.branchId, kind: 'Đã thu đủ · chờ kiosk trả phòng',
       detail: 'Đối chiếu thẻ và xác nhận kiosk đã hoàn tất trước khi chốt sổ',
-      action: <TextLink icon="bi-arrow-right" onClick={() => act.completeCheckout(b.code)}>Hoàn tất trả phòng</TextLink>
+      action: <TextLink icon="bi-arrow-right" onClick={() => detail(b)}>Kiểm tra & trả phòng</TextLink>
     })),
     ...scoped(data, data.rooms).filter(r => r.status === 'cleaning').map(r => ({
       key: `clean-${r.branchId}:${r.number}`, code: `Phòng ${r.number}`, room: r.number, branchId: r.branchId, kind: 'Chờ dọn',

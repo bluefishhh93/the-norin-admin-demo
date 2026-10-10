@@ -4,10 +4,9 @@ export const pageInfo: Record<string, [string, string, string]> = {
   dashboard: ['Tổng quan', 'Tổng quan hoạt động', 'Theo dõi toàn bộ hoạt động kinh doanh trong một góc nhìn.'],
   'work-queue': ['Cần xử lý', 'Việc cần xử lý', 'Các tín hiệu từ kiosk, tablet và camera.'],
   cashier: ['Thu ngân', 'Thu ngân & tiền mặt', 'Theo dõi yêu cầu thu tại kiosk và đối soát cuối ca.'],
-  'booking-lookup': ['Tra cứu', 'Tra cứu booking', 'Giờ hiệu lực, thanh toán và lịch sử theo lượt lưu trú.'],
-  'stay-orders': ['Đơn gọi thêm', 'Đơn gọi thêm từ tablet', 'Theo dõi món khách gọi trong thời gian lưu trú.'],
-  bookings: ['Đặt phòng', 'Đặt phòng & sơ đồ phòng', 'Chọn phòng và thời gian để tạo đặt phòng.'],
-  calendar: ['Lịch phòng', 'Lịch đặt phòng', 'Xem lịch lưu trú và phòng khả dụng theo ngày.'],
+  'booking-lookup': ['Booking', 'Quản lý booking', 'Danh sách, lịch đặt phòng và các thao tác theo lượt lưu trú.'],
+  'stay-orders': ['Đơn sản phẩm', 'Đơn sản phẩm', 'Chuẩn bị và giao sản phẩm đặt cùng booking hoặc gọi thêm.'],
+  bookings: ['Bảng phòng', 'Bảng phòng', 'Theo dõi phòng hiện tại, nhận khách và chuẩn bị lượt lưu trú tiếp theo.'],
   customers: ['Khách hàng', 'Khách hàng', 'Thông tin khách hàng từ các lượt đặt phòng.'],
   payments: ['Hóa đơn', 'Hóa đơn & folio', 'Tổng tiền, đã thu và còn nợ của từng lượt lưu trú.'],
   reports: ['Báo cáo', 'Báo cáo thu tiền', 'Số tiền đã nhận theo từng ngày và phương thức thanh toán.'],
@@ -35,10 +34,9 @@ export const navGroups: NavGroup[] = [
     { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan' },
     { page: 'work-queue', icon: 'bi-inboxes', label: 'Cần xử lý' },
     { page: 'cashier', icon: 'bi-cash-stack', label: 'Thu ngân & tiền mặt' },
-    { page: 'booking-lookup', icon: 'bi-search', label: 'Tra cứu booking' },
-    { page: 'stay-orders', icon: 'bi-bag-check', label: 'Đơn gọi thêm' },
+    { page: 'booking-lookup', icon: 'bi-calendar-check', label: 'Booking' },
+    { page: 'stay-orders', icon: 'bi-bag-check', label: 'Đơn sản phẩm' },
     { page: 'bookings', icon: 'bi-calendar3', label: 'Bảng phòng', count: true },
-    { page: 'calendar', icon: 'bi-calendar-range', label: 'Lịch phòng' },
     { page: 'customers', icon: 'bi-people', label: 'Khách hàng' }
   ] },
   { section: 'KINH DOANH', items: [
@@ -65,7 +63,7 @@ export const navGroups: NavGroup[] = [
   ] }
 ];
 
-const ALIASES: Record<string, string> = { rooms: 'bookings', housekeeping: 'bookings', 'room-content': 'room-classes', integrations: 'branches', 'room-qr': 'branches' };
+const ALIASES: Record<string, string> = { calendar: 'booking-lookup', rooms: 'bookings', housekeeping: 'bookings', 'room-content': 'room-classes', integrations: 'branches', 'room-qr': 'branches' };
 const readHash = () => {
   const raw = location.hash.slice(1);
   const page = ALIASES[raw] ?? raw;

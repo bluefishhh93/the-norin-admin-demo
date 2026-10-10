@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { DemoData } from './types';
 import { createSeed } from './seed';
 import { syncBranches } from './seed/base';
+import { normalizeBookings } from './booking/model';
 
 const STORAGE_KEY = 'norin_admin_demo_react_v1';
 
@@ -10,9 +11,12 @@ const load = (): DemoData => {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (saved && typeof saved === 'object' && Array.isArray(saved.rooms)) {
-      return Object.fromEntries(Object.keys(base).map(k => [k, saved[k] ?? base[k as keyof DemoData]])) as unknown as DemoData;
+      const restored = Object.fromEntries(Object.keys(base).map(k => [k, saved[k] ?? base[k as keyof DemoData]])) as unknown as DemoData;
+      normalizeBookings(restored);
+      return restored;
     }
   } catch {}
+  normalizeBookings(base);
   return base;
 };
 
@@ -53,7 +57,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeToast = useCallback(() => setToastText(null), []);
-  const reset = useCallback(() => { localStorage.removeItem(STORAGE_KEY); setData(createSeed()); }, []);
+  const reset = useCallback(() => { localStorage.removeItem(STORAGE_KEY); const seed = createSeed(); normalizeBookings(seed); setData(seed); }, []);
 
   const value = useMemo(() => ({ data, update, reset, toast, toastText, closeToast }), [data, update, reset, toast, toastText, closeToast]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

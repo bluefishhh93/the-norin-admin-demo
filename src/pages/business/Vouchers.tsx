@@ -104,7 +104,7 @@ export function Vouchers() {
           ))}
         </DataTable>
       </Panel>
-      <ScopeNote>Voucher hiện chỉ quản lý mã mẫu, chưa trừ tiền hoặc giữ mã khi tạo booking. Trạng thái phòng trên lưới không phụ thuộc voucher.</ScopeNote>
+      <ScopeNote>Voucher được kiểm tra khi tạo booking theo chi nhánh, lịch lưu trú, thời hạn, thứ và số lượt. Ưu đãi chỉ áp dụng cho booking ban đầu, không cộng thêm cho sản phẩm hoặc gia hạn về sau.</ScopeNote>
     </>
   );
 }

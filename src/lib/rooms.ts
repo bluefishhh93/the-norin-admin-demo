@@ -1,6 +1,5 @@
 import type { Booking, DemoData, PriceType, Room, RoomPrice, Season, StayType } from '../types';
 
-export const CLEANING_MS = 30 * 60000;
 export const ACTIVE_BOOKING = ['confirmed', 'checked-in', 'pending'];
 
 export const roomKey = (room: Pick<Room, 'branchId' | 'number'>) => `${room.branchId}:${room.number}`;
@@ -9,8 +8,8 @@ export const className = (d: DemoData, room: Room) => classOf(d, room)?.name || 
 
 export const bookingInterval = (d: DemoData, b: Booking): [number, number] | null => {
   const folio = d.folios.find(f => f.code === b.id);
-  const start = Date.parse(b.startsAt || folio?.effectiveCheckInTime || '');
-  const end = Date.parse(b.endsAt || folio?.effectiveCheckOutTime || '');
+  const start = Date.parse(folio?.effectiveCheckInTime || b.startsAt || '');
+  const end = Date.parse(folio?.orderDetailCheckOutTime || folio?.effectiveCheckOutTime || b.endsAt || '');
   return Number.isFinite(start) && Number.isFinite(end) && end > start ? [start, end] : null;
 };
 
@@ -19,7 +18,12 @@ export interface BusyRange { booking: Booking; start: number; end: number }
 export const roomBusy = (d: DemoData, room: Room): BusyRange[] =>
   d.bookings
     .filter(b => b.branchId === room.branchId && b.room === room.number && ACTIVE_BOOKING.includes(b.status))
-    .flatMap(booking => { const i = bookingInterval(d, booking); return i ? [{ booking, start: i[0], end: i[1] }] : []; });
+    .flatMap(booking => {
+      const i = bookingInterval(d, booking);
+      const folio = d.folios.find(f => f.code === booking.id);
+      const occupied = folio?.detailStatus === 2 && !folio.actualCheckOutAt;
+      return i ? [{ booking, start: i[0], end: occupied ? Math.max(i[1], Date.now()) : i[1] }] : [];
+    });
 
 const clock = (value: string) => { const [h, m] = value.split(':').map(Number); return [h || 0, m || 0] as const; };
 
@@ -35,16 +39,19 @@ export const stayWindow = (d: DemoData, type: Exclude<StayType, 'Theo giờ'>, d
   return [start, end];
 };
 
-export const checkRoomInterval = (d: DemoData, room: Room | undefined, start: Date, end: Date, type: StayType): true | string => {
+export const checkRoomInterval = (d: DemoData, room: Room | undefined, start: Date, end: Date, type: StayType, excludeCode?: string, allowPast = false, validateDuration = true): true | string => {
   if (!room || (d.role !== 'superadmin' && room.branchId !== 'sontra')) return 'Phòng không khả dụng.';
-  if (room.status === 'cleaning') return 'Phòng đang dọn; hãy hoàn tất dọn trước khi đặt.';
-  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start || start < new Date()) return 'Kiểm tra thời điểm nhận và trả phòng.';
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start || (!allowPast && start.getTime() < Date.now() - 60000)) return 'Kiểm tra thời điểm nhận và trả phòng.';
+  if (room.status === 'cleaning' && start.getTime() < Math.max(Date.now() + 60000, Date.parse(room.cleaningReadyAt || '') || Date.now() + d.rules.cleaningBuffer * 60000)) return 'Phòng đang dọn, chưa sẵn sàng trong khoảng này.';
+  const current = d.folios.find(f => f.branchId === room.branchId && f.room === room.number && f.code !== excludeCode && f.detailStatus === 2 && f.status !== 3 && !f.actualCheckOutAt);
+  if (current && start.getTime() <= Date.now() + 60000) return 'Phòng đang có khách, chưa thể nhận khách mới.';
   const hours = (end.getTime() - start.getTime()) / 3600000;
-  if (type === 'Theo giờ' && (!Number.isInteger(hours) || hours < 2 || hours > 8)) return 'Đặt theo giờ phải từ 2 đến 8 tiếng, bước 1 tiếng.';
-  if (type === 'Qua đêm' && (hours < 2 || hours > 24 || start.toDateString() === end.toDateString())) return 'Kiểm tra thời gian qua đêm.';
-  if (type === 'Theo ngày' && (hours < 12 || start.toDateString() === end.toDateString())) return 'Đặt theo ngày phải trả phòng vào ngày hôm sau trở đi.';
-  const conflict = roomBusy(d, room).some(b => start.getTime() < b.end + CLEANING_MS && end.getTime() > b.start - CLEANING_MS);
-  if (conflict) return 'Khoảng giờ đã có khách hoặc thuộc thời gian dọn phòng trước/sau 30 phút.';
+  if (validateDuration && type === 'Theo giờ' && (!Number.isInteger(hours) || hours < 2 || hours > d.rules.maxHourlyStay)) return `Đặt theo giờ từ 2 đến ${d.rules.maxHourlyStay} tiếng, bước 1 tiếng.`;
+  if (validateDuration && type === 'Qua đêm' && (hours < 2 || hours > 24 || start.toDateString() === end.toDateString())) return 'Kiểm tra thời gian qua đêm.';
+  if (validateDuration && type === 'Theo ngày' && (hours < 12 || start.toDateString() === end.toDateString())) return 'Đặt theo ngày phải trả phòng vào ngày hôm sau trở đi.';
+  const buffer = d.rules.cleaningBuffer * 60000;
+  const conflict = roomBusy(d, room).some(b => b.booking.id !== excludeCode && start.getTime() < b.end + buffer && end.getTime() + buffer > b.start);
+  if (conflict) return `Lịch trùng booking khác hoặc chưa đủ ${d.rules.cleaningBuffer} phút dọn giữa hai lượt.`;
   const cls = classOf(d, room);
   const blocked = d.blocks.some(b => b.enabled && b.branchId === room.branchId && b.category === cls?.name &&
     start.getTime() < Date.parse(b.to || '9999-12-31') && end.getTime() > Date.parse(b.from));
@@ -82,15 +89,23 @@ export const baseRate = (rate: RoomPrice, type: PriceType, weekday?: number) => 
 
 export const getRoomPrice = (d: DemoData, branchId: string, roomNumber: string, type: StayType, at: Date, end: Date): number | null => {
   const room = d.rooms.find(r => r.branchId === branchId && r.number === roomNumber);
-  if (!room) return null;
+  if (!room || !Number.isFinite(at.getTime()) || !Number.isFinite(end.getTime()) || end <= at) return null;
   const rate = roomRate(d, room);
   if (!rate) return null;
   const priceType = stayToPrice[type];
+  if (type !== 'Theo giờ') {
+    const first = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    let total = 0;
+    for (const day = new Date(first); day < last; day.setDate(day.getDate() + 1)) {
+      total += applySeason(baseRate(rate, priceType, day.getDay()), seasonFor(d, room, dayKeyOf(day)));
+    }
+    return total;
+  }
   const season = seasonFor(d, room, dayKeyOf(at));
   const base = applySeason(baseRate(rate, priceType, at.getDay()), season);
-  if (type !== 'Theo giờ') return base;
-  const hours = (end.getTime() - at.getTime()) / 3600000;
-  if (!Number.isInteger(hours) || hours < 2 || hours > 8) return null;
+  const hours = Math.max(2, Math.ceil((end.getTime() - at.getTime()) / 3600000));
+  if (hours > d.rules.maxHourlyStay) return null;
   return base + (hours - 2) * applySeason(rate.extra, season);
 };
 
