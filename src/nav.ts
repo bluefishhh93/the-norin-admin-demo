@@ -9,8 +9,7 @@ export const pageInfo: Record<string, [string, string, string]> = {
   bookings: ['Bảng phòng', 'Bảng phòng', 'Theo dõi phòng hiện tại, nhận khách và chuẩn bị lượt lưu trú tiếp theo.'],
   customers: ['Khách hàng', 'Khách hàng', 'Thông tin khách hàng từ các lượt đặt phòng.'],
   payments: ['Hóa đơn', 'Hóa đơn & folio', 'Tổng tiền, đã thu và còn nợ của từng lượt lưu trú.'],
-  cashbook: ['Sổ quỹ', 'Sổ quỹ thu chi', 'Phiếu thu, phiếu chi và tồn quỹ tiền mặt theo chi nhánh.'],
-  reports: ['Báo cáo', 'Báo cáo kinh doanh', 'Doanh thu, thanh toán, công suất và sản phẩm từ dữ liệu admin.'],
+  reports: ['Báo cáo', 'Báo cáo thu tiền', 'Số tiền đã nhận theo từng ngày và phương thức thanh toán.'],
   pricing: ['Bảng giá', 'Bảng giá phòng', 'Giá theo giờ, qua đêm và theo ngày cho từng chi nhánh.'],
   vouchers: ['Voucher', 'Chương trình voucher', 'Tạo mã ưu đãi và theo dõi lượt sử dụng.'],
   products: ['Sản phẩm', 'Sản phẩm & dịch vụ', 'Danh mục hàng hóa và dịch vụ bán kèm.'],
@@ -42,7 +41,6 @@ export const navGroups: NavGroup[] = [
   ] },
   { section: 'KINH DOANH', items: [
     { page: 'payments', icon: 'bi-receipt', label: 'Hóa đơn' },
-    { page: 'cashbook', icon: 'bi-journal-text', label: 'Sổ quỹ' },
     { page: 'reports', icon: 'bi-bar-chart-line', label: 'Báo cáo' },
     { page: 'pricing', icon: 'bi-tags', label: 'Bảng giá' },
     { page: 'vouchers', icon: 'bi-ticket-perforated', label: 'Voucher' },

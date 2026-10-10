@@ -1,4 +1,4 @@
-import type { Booking, DemoData, PriceType, Room, StayType } from '../types';
+import type { Booking, DemoData, PriceType, Room, RoomPrice, Season, StayType } from '../types';
 
 export const ACTIVE_BOOKING = ['confirmed', 'checked-in', 'pending'];
 
@@ -60,31 +60,53 @@ export const checkRoomInterval = (d: DemoData, room: Room | undefined, start: Da
 
 const stayToPrice: Record<StayType, PriceType> = { 'Theo giờ': 'Giờ', 'Qua đêm': 'Qua đêm', 'Theo ngày': 'Ngày đêm' };
 
+export const roomRate = (d: DemoData, room: Room): RoomPrice | null => {
+  if (room.price) return room.price;
+  const p = d.pricebooks.find(row => row.branchId === room.branchId && row.category === className(d, room));
+  if (!p) return null;
+  return {
+    hourly: Number(p.hourlySteps?.[0]?.price) || +p.hourly,
+    extra: Number(p.hourlySteps?.[1]?.price) || 0,
+    overnight: +p.overnight, daily: +p.daily, weekdayRates: p.weekdayRates
+  };
+};
+
+export const dayKeyOf = (at: Date) => `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+
+export const activeSeasons = (d: DemoData) => (d.season || []).filter(s => Array.isArray(s.rooms) && s.mode);
+
+export const seasonFor = (d: DemoData, room: Pick<Room, 'branchId' | 'number'>, dayKey: string) =>
+  activeSeasons(d).find(s => s.branchId === room.branchId && s.rooms.includes(room.number) && dayKey >= s.from && dayKey <= s.to);
+
+export const applySeason = (price: number, s?: Season) =>
+  !s ? price : s.mode === 'percent' ? Math.round(price * (1 + s.value / 100) / 1000) * 1000 : price + s.value;
+
+export const baseRate = (rate: RoomPrice, type: PriceType, weekday?: number) => {
+  const custom = weekday == null ? undefined : rate.weekdayRates?.[type]?.[String(weekday)];
+  if (custom != null) return Number(custom);
+  return type === 'Giờ' ? rate.hourly : type === 'Qua đêm' ? rate.overnight : rate.daily;
+};
+
 export const getRoomPrice = (d: DemoData, branchId: string, roomNumber: string, type: StayType, at: Date, end: Date): number | null => {
   const room = d.rooms.find(r => r.branchId === branchId && r.number === roomNumber);
   if (!room || !Number.isFinite(at.getTime()) || !Number.isFinite(end.getTime()) || end <= at) return null;
-  const category = className(d, room);
-  const p = d.pricebooks.find(row => row.branchId === branchId && row.category === category);
-  if (!p) return null;
-  const extra = Number(p.hourlySteps?.[1]?.price) || 0;
-  const dateKey = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+  const rate = roomRate(d, room);
+  if (!rate) return null;
   const priceType = stayToPrice[type];
-  const season = d.season.find(s => s.branchId === branchId && s.category === category && s.type === priceType && dateKey >= s.from && dateKey <= s.to);
-  const weekday = p.weekdayRates?.[priceType]?.[String(at.getDay())];
   if (type !== 'Theo giờ') {
     const first = new Date(at.getFullYear(), at.getMonth(), at.getDate());
     const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
     let total = 0;
     for (const day = new Date(first); day < last; day.setDate(day.getDate() + 1)) {
-      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-      const rate = d.season.find(s => s.branchId === branchId && s.category === category && s.type === priceType && key >= s.from && key <= s.to);
-      total += Number(rate?.price ?? p.weekdayRates?.[priceType]?.[String(day.getDay())] ?? (type === 'Qua đêm' ? p.overnight : p.daily));
+      total += applySeason(baseRate(rate, priceType, day.getDay()), seasonFor(d, room, dayKeyOf(day)));
     }
     return total;
   }
+  const season = seasonFor(d, room, dayKeyOf(at));
+  const base = applySeason(baseRate(rate, priceType, at.getDay()), season);
   const hours = Math.max(2, Math.ceil((end.getTime() - at.getTime()) / 3600000));
   if (hours > d.rules.maxHourlyStay) return null;
-  return Number(season?.price ?? weekday ?? p.hourlySteps?.[0]?.price ?? p.hourly) + (hours - 2) * extra;
+  return base + (hours - 2) * applySeason(rate.extra, season);
 };
 
 export const priceValue = (p: DemoData['pricebooks'][number], type: PriceType) =>

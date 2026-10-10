@@ -16,9 +16,15 @@ export interface Branch {
   integrations?: BranchIntegrations;
 }
 
+export interface RoomPrice {
+  hourly: number; extra: number; overnight: number; daily: number;
+  weekdayRates?: Partial<Record<PriceType, Record<string, number>>>;
+}
+
 export interface Room {
   branchId: string;
   number: string;
+  price?: RoomPrice;
   status: RoomStatus;
   classId: string;
   masterProductId: number;
@@ -81,7 +87,7 @@ export interface RoomClass {
   music: string; active: boolean; image?: string; aboutSections?: string; sensoryExperience?: string; whyChooseUs?: string; translationEn?: string;
 }
 
-export interface Season { branchId: string; category: string; type: PriceType; from: string; to: string; price: number }
+export interface Season { id: string; branchId: string; rooms: string[]; name: string; from: string; to: string; mode: 'percent' | 'amount'; value: number }
 
 export interface OrderLine { name: string; productId?: string; productType: number; phase: 'booking' | 'stay'; quantity: number; price: number; source?: string; orderedAt?: string; stockReserved?: boolean; fulfillment?: 'new' | 'preparing' | 'delivered' | 'cancelled' }
 export interface ProductSelection { productId: string; quantity: number }

@@ -9,7 +9,6 @@ import { StayOrders } from './workflow/StayOrders';
 import { Bookings } from './rooms/Bookings';
 import { Notifications } from './workflow/Notifications';
 import { Payments } from './business/Payments';
-import { Cashbook } from './business/Cashbook';
 import { Reports } from './business/Reports';
 import { Pricing } from './business/Pricing';
 import { Vouchers } from './business/Vouchers';
@@ -34,7 +33,6 @@ export const pages: Record<string, ComponentType<PageProps>> = {
   bookings: Bookings,
   customers: Customers,
   payments: Payments,
-  cashbook: Cashbook,
   reports: Reports,
   pricing: Pricing,
   vouchers: Vouchers,

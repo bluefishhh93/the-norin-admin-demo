@@ -1,109 +1,118 @@
 import { useState } from 'react';
-import type { Pricebook, PriceType } from '../../types';
+import type { PriceType, Room, Season } from '../../types';
 import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
-import { Field, Select } from '../../components/Form';
 import { branches } from '../../seed/base';
-import { branchName, money, moneyOrDash } from '../../lib/format';
-import { defaultBranch, isAllowedBranch } from '../../lib/scope';
-import { priceValue } from '../../lib/rooms';
+import { branchName, moneyComma as money, moneyCommaOrDash as moneyOrDash } from '../../lib/format';
+import { defaultBranch, isAllowedBranch, scoped } from '../../lib/scope';
+import { activeSeasons, applySeason, baseRate, className, roomRate, seasonFor, dayKeyOf } from '../../lib/rooms';
 import { DataTable, Panel, PrimaryButton, ScopeNote, Tabs, TextLink } from '../../components/ui';
+import { HolidayFields, RateFields, WEEKDAYS } from './PriceForms';
 
-const PRICE_TYPES: PriceType[] = ['Ngày đêm', 'Qua đêm', 'Giờ'];
-const WEEKDAYS: [string, string][] = [['0', 'Chủ nhật'], ['1', 'Thứ 2'], ['2', 'Thứ 3'], ['3', 'Thứ 4'], ['4', 'Thứ 5'], ['5', 'Thứ 6'], ['6', 'Thứ 7']];
+const PRICE_TYPES: PriceType[] = ['Giờ', 'Qua đêm', 'Ngày đêm'];
+const TYPE_LABELS: Partial<Record<PriceType, string>> = { 'Giờ': 'Theo giờ', 'Qua đêm': 'Qua đêm', 'Ngày đêm': 'Theo ngày' };
+const roomId = (r: Pick<Room, 'branchId' | 'number'>) => `${r.branchId}:${r.number}`;
 
 export function Pricing() {
   const { data, update, toast } = useStore();
   const modal = useModal();
   const [tab, setTab] = useState<PriceType>('Giờ');
-  const inScope = (branchId: string) => data.role === 'superadmin' ? data.branchId === 'all' || data.branchId === branchId : branchId === 'sontra';
-  const prices = data.pricebooks.filter(p => inScope(p.branchId));
-  const seasons = data.season.filter(s => inScope(s.branchId));
+  const rooms = scoped(data, data.rooms).sort((a, b) => a.branchId.localeCompare(b.branchId) || a.number.localeCompare(b.number));
+  const seasons = scoped(data, activeSeasons(data)).sort((a, b) => a.from.localeCompare(b.from));
+  const today = dayKeyOf(new Date());
+  const branchOpts = (data.role === 'superadmin' ? branches : branches.filter(b => b.id === 'sontra')).map(b => [b.id, b.name] as [string, string]);
 
-  const editRate = (p: Pricebook) => {
-    if (!isAllowedBranch(data, p.branchId)) return;
+  const editRate = (room: Room) => {
+    const rate = roomRate(data, room);
+    if (!rate || !isAllowedBranch(data, room.branchId)) return;
     const type = tab;
-    const base = p.hourlySteps[0]?.price ?? p.hourly;
-    const extra = p.hourlySteps[1]?.price ?? 0;
+    const roomSeasons = seasons.filter(s => s.branchId === room.branchId && s.rooms.includes(room.number) && s.to >= today);
     modal.openForm({
-      title: `${type} · ${p.category} · ${branchName(p.branchId)}`, size: 'lg',
-      body: <>
-        {type === 'Giờ' ? <>
-          <ScopeNote icon={null}>Tối thiểu 2 tiếng, tối đa 8 tiếng. Giá 2 tiếng đầu + một mức cố định cho mỗi tiếng thêm (tối đa 6 tiếng).</ScopeNote>
-          <Field label="Giá 2 tiếng đầu (₫)" name="baseHourly" type="number" min={0} defaultValue={base} required />
-          <Field label="Mỗi tiếng thêm (₫)" name="extraHourly" type="number" min={0} defaultValue={extra} required />
-          <ScopeNote icon={null}>Xem trước: {Array.from({ length: 7 }, (_, i) => `${i + 2} giờ: ${money(base + i * extra)}`).join(' · ')}</ScopeNote>
-        </> : <Field label="Giá chung (₫)" name="basePrice" type="number" min={0} defaultValue={priceValue(p, type)} required />}
-        <fieldset className="rate-step">
-          <legend>Giá theo thứ trong tuần (để trống = giá chung)</legend>
-          {WEEKDAYS.map(([day, label]) => <Field key={day} label={label} name={`weekday${day}`} type="number" min={0} placeholder="Theo giá chung" defaultValue={p.weekdayRates?.[type]?.[day] ?? ''} />)}
-        </fieldset>
-      </>,
+      title: `Phòng ${room.number} · ${TYPE_LABELS[type]} · ${branchName(room.branchId)}`, size: 'lg',
+      body: <RateFields type={type} rate={rate} seasons={roomSeasons} />,
       onSubmit: v => {
         update(d => {
-          const t = d.pricebooks.find(x => x.branchId === p.branchId && x.category === p.category);
-          if (!t) return;
-          if (type === 'Giờ') {
-            t.hourly = +v.baseHourly;
-            t.hourlySteps = [{ fromThHour: 1, toHour: 2, price: +v.baseHourly, type: 'block' }, { fromThHour: 3, toHour: 8, price: +v.extraHourly, type: 'hourly' }];
-          } else if (type === 'Qua đêm') t.overnight = +v.basePrice;
-          else t.daily = +v.basePrice;
-          t.weekdayRates ||= {};
-          t.weekdayRates[type] = Object.fromEntries(WEEKDAYS.map(([day]) => [day, v[`weekday${day}`]]).filter(([, price]) => price !== '').map(([day, price]) => [day, +price]));
+          const target = d.rooms.find(r => roomId(r) === roomId(room));
+          if (!target) return;
+          const next = { ...rate, ...target.price };
+          if (type === 'Giờ') { next.hourly = +v.base; next.extra = +v.extra; }
+          else if (type === 'Qua đêm') next.overnight = +v.base;
+          else next.daily = +v.base;
+          next.weekdayRates = { ...next.weekdayRates, [type]: Object.fromEntries(WEEKDAYS.map(([day]) => [day, v[`weekday${day}`]]).filter(([, p]) => p !== '').map(([day, p]) => [day, +p])) };
+          target.price = next;
         });
-        toast('Đã lưu thay đổi trong bản demo.');
+        toast(`Đã lưu giá phòng ${room.number}.`);
       }
     });
   };
 
-  const addSeason = () => {
-    const categories = [...new Set(prices.map(p => p.category))];
-    const branchOpts = (data.role === 'superadmin' ? branches : branches.filter(b => b.id === 'sontra')).map(b => [b.id, b.name] as [string, string]);
+  const editHoliday = (season?: Season) => {
     modal.openForm({
-      title: 'Giá mùa, dịp lễ',
-      body: <>
-        <Select label="Chi nhánh" name="branchId" options={branchOpts} defaultValue={defaultBranch(data)} required />
-        <Select label="Hạng phòng" name="category" options={categories.map(c => [c, c])} required />
-        <Select label="Loại giá" name="type" options={PRICE_TYPES.map(t => [t, t])} defaultValue={tab} required />
-        <Field label="Từ ngày" name="from" type="date" required />
-        <Field label="Đến ngày" name="to" type="date" required />
-        <Field label="Giá (₫)" name="price" type="number" min={0} required />
-      </>,
-      onSubmit: v => {
-        if (!isAllowedBranch(data, v.branchId) || v.from > v.to || !data.pricebooks.some(p => p.branchId === v.branchId && p.category === v.category)) {
-          toast('Kiểm tra chi nhánh, hạng và khoảng ngày.'); return false;
+      title: season ? `Sửa ngày lễ · ${season.name}` : 'Thêm giá ngày lễ', size: 'lg',
+      body: <HolidayFields data={data} branchOpts={branchOpts} branchId={defaultBranch(data)} season={season} />,
+      onSubmit: (v, form) => {
+        const picked = new FormData(form).getAll('rooms').map(String);
+        if (!isAllowedBranch(data, v.branchId) || !v.from || !v.to || v.from > v.to || !picked.length || !Number.isFinite(+v.value)) {
+          toast('Kiểm tra khoảng ngày, mức tăng và chọn ít nhất 1 phòng.'); return false;
         }
-        update(d => { d.season.push({ branchId: v.branchId, category: v.category, type: v.type as PriceType, from: v.from, to: v.to, price: +v.price }); });
-        toast('Đã lưu thay đổi trong bản demo.');
+        const next: Season = { id: season?.id ?? `HD-${Date.now()}`, branchId: v.branchId, rooms: picked, name: v.name.trim(), from: v.from, to: v.to, mode: v.mode as Season['mode'], value: +v.value };
+        update(d => {
+          d.season = activeSeasons(d).filter(s => s.id !== next.id);
+          d.season.push(next);
+        });
+        toast(season ? 'Đã cập nhật ngày lễ.' : 'Đã thêm giá ngày lễ.');
       }
     });
   };
+
+  const removeHoliday = (s: Season) => {
+    update(d => { d.season = activeSeasons(d).filter(x => x.id !== s.id); });
+    toast(`Đã xóa ${s.name}.`);
+  };
+
+  const custom = (room: Room) => room.price?.weekdayRates?.[tab] && Object.keys(room.price.weekdayRates[tab]!).length;
 
   return (
     <>
       <div className="reception-toolbar">
-        <Tabs items={PRICE_TYPES} value={tab} onChange={setTab} />
-        <PrimaryButton icon="bi-calendar-event" onClick={addSeason}>Mùa, dịp lễ</PrimaryButton>
+        <Tabs items={PRICE_TYPES} value={tab} onChange={setTab} labels={TYPE_LABELS} />
+        <PrimaryButton icon="bi-calendar-event" onClick={() => editHoliday()}>Thêm ngày lễ</PrimaryButton>
       </div>
-      <ScopeNote>Theo giờ: 2 tiếng đầu + cùng một giá cho mỗi tiếng thêm, tối đa 8 tiếng. Giá theo thứ và mùa được áp dụng tại màn tạo đặt phòng trong demo.</ScopeNote>
+      <ScopeNote>Giá đặt riêng cho từng phòng. Phòng chưa đặt giá sẽ lấy giá mặc định của hạng phòng. Ngày lễ tăng giá cho các phòng được chọn trong khoảng ngày đó.</ScopeNote>
       <Panel>
-        <DataTable headers={['CHI NHÁNH', 'HẠNG PHÒNG', 'TẤT CẢ CÁC NGÀY', 'T2 – CN', 'THAO TÁC']}>
-          {prices.map(p => (
-            <tr key={`${p.branchId}:${p.category}`}>
-              <td>{branchName(p.branchId)}</td>
-              <td><strong>{p.category}</strong></td>
-              <td><strong>{moneyOrDash(priceValue(p, tab))}</strong>
-                {tab === 'Giờ' && <small>{p.hourlySteps.map(s => `Từ giờ ${s.fromThHour}: ${moneyOrDash(s.price)} / ${s.type === 'block' ? 'block' : 'giờ'}`).join(' · ')}</small>}
-              </td>
-              <td>{p.weekdayRates?.[tab] && Object.keys(p.weekdayRates[tab]!).length ? 'Đã tùy chỉnh theo thứ' : 'Theo giá chung'}</td>
-              <td><TextLink onClick={() => editRate(p)}>Thiết lập giá</TextLink></td>
-            </tr>
-          ))}
+        <DataTable headers={['CHI NHÁNH', 'PHÒNG', 'HẠNG', tab === 'Giờ' ? '2 TIẾNG ĐẦU' : 'GIÁ', tab === 'Giờ' ? 'MỖI TIẾNG THÊM' : 'THEO THỨ', 'HÔM NAY', 'THAO TÁC']}>
+          {rooms.map(room => {
+            const rate = roomRate(data, room);
+            const season = seasonFor(data, room, today);
+            const base = rate ? baseRate(rate, tab) : null;
+            const now = rate ? applySeason(baseRate(rate, tab, new Date().getDay()), season) : null;
+            return (
+              <tr key={roomId(room)}>
+                <td>{branchName(room.branchId)}</td>
+                <td><strong>Phòng {room.number}</strong>{!room.price && <small>Giá mặc định của hạng</small>}</td>
+                <td>{className(data, room)}</td>
+                <td><strong>{moneyOrDash(base)}</strong></td>
+                <td>{tab === 'Giờ' ? moneyOrDash(rate?.extra) : custom(room) ? 'Đã tùy chỉnh' : 'Theo giá chung'}</td>
+                <td>{moneyOrDash(now)}{season && <small>{season.name}</small>}</td>
+                <td><TextLink onClick={() => editRate(room)}>Đặt giá</TextLink></td>
+              </tr>
+            );
+          })}
         </DataTable>
       </Panel>
-      <Panel title="Mùa và dịp lễ" subtitle="Giá ưu tiên theo khoảng ngày">
-        <DataTable headers={['CHI NHÁNH', 'HẠNG', 'LOẠI GIÁ', 'TỪ', 'ĐẾN', 'GIÁ']}>
-          {seasons.map((s, i) => <tr key={i}><td>{branchName(s.branchId)}</td><td>{s.category}</td><td>{s.type}</td><td>{s.from}</td><td>{s.to}</td><td>{moneyOrDash(s.price)}</td></tr>)}
+      <Panel title="Giá ngày lễ" subtitle="Tăng giá các phòng đã chọn trong khoảng ngày">
+        <DataTable headers={['DỊP', 'CHI NHÁNH', 'TỪ', 'ĐẾN', 'MỨC TĂNG', 'PHÒNG', 'THAO TÁC']}>
+          {seasons.map(s => (
+            <tr key={s.id}>
+              <td><strong>{s.name}</strong>{s.to < today && <small>Đã qua</small>}</td>
+              <td>{branchName(s.branchId)}</td>
+              <td>{s.from}</td>
+              <td>{s.to}</td>
+              <td><strong>{s.mode === 'percent' ? `${s.value > 0 ? '+' : ''}${s.value}%` : `+${money(s.value)}`}</strong></td>
+              <td>{s.rooms.length > 4 ? `${s.rooms.length} phòng` : s.rooms.join(', ')}</td>
+              <td><TextLink onClick={() => editHoliday(s)}>Sửa</TextLink> <TextLink icon="bi-trash" onClick={() => removeHoliday(s)}>Xóa</TextLink></td>
+            </tr>
+          ))}
         </DataTable>
       </Panel>
     </>
