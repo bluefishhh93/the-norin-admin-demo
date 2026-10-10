@@ -2,6 +2,9 @@ import { branches } from '../seed/base';
 
 export const money = (value: number) => new Intl.NumberFormat('vi-VN').format(value) + ' ₫';
 export const moneyOrDash = (value: unknown) => Number.isFinite(Number(value)) ? money(Number(value)) : '—';
+export const groupComma = (value: number | string) => new Intl.NumberFormat('en-US').format(Number(value) || 0);
+export const moneyComma = (value: number) => `${groupComma(value)} ₫`;
+export const moneyCommaOrDash = (value: unknown) => value != null && value !== '' && Number.isFinite(Number(value)) ? moneyComma(Number(value)) : '—';
 export const branchName = (id: string) => branches.find(b => b.id === id)?.name || '';
 
 export const fmtDateTime = (value?: string | null) => value
