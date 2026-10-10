@@ -1,0 +1,268 @@
+.voucher-weekdays {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 0;
+}
+
+.voucher-weekdays legend {
+  float: none;
+  width: auto;
+  padding: 0 5px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #68717d;
+}
+
+.voucher-weekdays label {
+  font-size: 12px;
+  color: #647080;
+  white-space: nowrap;
+}
+
+.voucher-weekdays input {
+  accent-color: var(--accent);
+}
+
+.reception-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.rate-step {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.rate-step legend {
+  float: none;
+  width: auto;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.product-thumb {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f3f2f0;
+}
+
+.placeholder-image {
+  color: #a5aab0;
+}
+
+.product-preview {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+
+.reception-grid-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #89919d;
+  font-size: 11px;
+}
+
+.reception-grid-controls label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #47505e;
+  font-weight: 700;
+}
+
+.pms-bar {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+.pms-bar > div {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.pms-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.pms-bar span {
+  color: var(--muted);
+}
+
+.timeline-controls-left {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.timeline-month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-month button {
+  width: 34px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #47505e;
+}
+
+.timeline-month input {
+  width: 160px;
+}
+
+.price-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.price-inputs .form-label,
+.price-weekdays .form-label {
+  margin-bottom: 12px;
+}
+
+.price-preview {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+.price-preview-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--canvas);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  min-width: 0;
+}
+
+.price-preview-card span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.price-preview-card strong {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.price-weekdays {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 10px;
+}
+
+.price-season-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #647080;
+}
+
+.price-season-row + .price-season-row {
+  border-top: 1px solid var(--border);
+}
+
+.price-room-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #47505e;
+  margin-bottom: 8px;
+}
+
+.price-room-picks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.price-room-picks label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.price-room-picks label.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.price-room-picks label small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.price-room-all input,
+.price-room-picks input {
+  accent-color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .price-preview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .price-weekdays,
+  .price-room-picks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .price-inputs {
+    grid-template-columns: 1fr;
+  }
+}

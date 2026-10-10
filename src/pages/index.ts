@@ -1,10 +1,10 @@
 import type { ComponentType } from 'react';
 import { Dashboard } from './Dashboard';
 import { Customers } from './Customers';
-import { Branches } from './Branches';
+import { Branches } from './branches/Branches';
 import { WorkQueue } from './workflow/WorkQueue';
 import { Cashier } from './workflow/Cashier';
-import { BookingLookup } from './workflow/BookingLookup';
+import { BookingLookup } from '../booking/BookingLookup';
 import { StayOrders } from './workflow/StayOrders';
 import { Bookings } from './rooms/Bookings';
 import { Notifications } from './workflow/Notifications';
@@ -22,7 +22,9 @@ import { Kiosks } from './system/Kiosks';
 import { BranchSettings } from './system/BranchSettings';
 import { Settings } from './system/Settings';
 import { Staff } from './system/Staff';
-export interface PageProps { navigate: (page: string) => void }
+export interface PageProps {
+  navigate: (page: string) => void;
+}
 
 export const pages: Record<string, ComponentType<PageProps>> = {
   dashboard: Dashboard,
