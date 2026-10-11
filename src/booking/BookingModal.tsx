@@ -11,6 +11,21 @@ import { ProductPicker } from './ProductPicker';
 import { quoteVoucher } from './voucher';
 import { saleProducts } from './products';
 import { isAllowedBranch } from '../lib/scope';
+import {
+  CONTACT_FIELDS,
+  DEFAULT_BOOKING_PASSWORD,
+  contactErrors,
+  normalizePhone,
+  type ContactField,
+  type NotifyChannel
+} from './contact';
+
+const FIELD_IDS: Record<ContactField, string> = {
+  customer: 'bookingCustomer',
+  phone: 'bookingPhone',
+  email: 'bookingEmail',
+  password: 'bookingPassword'
+};
 
 export function BookingModal({
   open,
@@ -31,9 +46,8 @@ export function BookingModal({
     initialType === 'Theo giờ'
       ? [initialStart, preset.end ?? new Date(+initialStart + 7200000)]
       : stayWindow(data, initialType, localDateTime(initialStart).slice(0, 10));
-  const [branchId, setBranchId] = useState(
-    preset.branchId ?? (data.branchId === 'all' ? (allowed[0]?.id ?? '') : data.branchId)
-  );
+  const branchId =
+    preset.branchId ?? (data.branchId === 'all' ? (allowed[0]?.id ?? '') : data.branchId);
   const [room, setRoom] = useState(preset.room ?? '');
   const [type, setType] = useState<StayType>(initialType);
   const [receiveNow, setReceiveNow] = useState(preset.receiveNow ?? false);
@@ -45,6 +59,10 @@ export function BookingModal({
   const [customer, setCustomer] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState(DEFAULT_BOOKING_PASSWORD);
+  const [notify, setNotify] = useState<NotifyChannel>('zalo');
+  const [touched, setTouched] = useState<Partial<Record<ContactField, boolean>>>({});
+  const [tried, setTried] = useState(false);
   const [note, setNote] = useState('');
   const [timing, setTiming] = useState<PaymentTiming>('postpaid');
   const [method, setMethod] = useState<PayMethod>('cash');
@@ -67,6 +85,11 @@ export function BookingModal({
   );
   const quote = quoteVoucher(data, branchId, type, actualStart, price ?? 0, products, voucherCode);
   const total = Math.max(0, (price ?? 0) + productTotal - quote.discount);
+  const errors = contactErrors({ customer, phone, email, password, notify });
+  const fieldError = (field: ContactField) =>
+    (tried || touched[field]) && errors[field] ? errors[field] : undefined;
+  const touch = (field: ContactField) => setTouched((t) => (t[field] ? t : { ...t, [field]: true }));
+  const roomError = tried && !room ? 'Chọn phòng còn trống.' : undefined;
 
   const schedule = (value: string, nextType = type, hours = duration) => {
     if (nextType === 'Theo giờ') {
@@ -81,6 +104,13 @@ export function BookingModal({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (submitted.current) return;
+    setTried(true);
+    const firstInvalid = CONTACT_FIELDS.find((f) => errors[f]);
+    if (!room || firstInvalid) {
+      setError('');
+      document.getElementById(room ? FIELD_IDS[firstInvalid!] : 'bookingRoom')?.focus();
+      return;
+    }
     const input = {
       branchId,
       room,
@@ -88,6 +118,8 @@ export function BookingModal({
       customer,
       phone,
       email,
+      password,
+      notify,
       note,
       start,
       end,
@@ -129,7 +161,7 @@ export function BookingModal({
         </>
       }
     >
-      <form id="bookingForm" onSubmit={submit} className="booking-create-layout">
+      <form id="bookingForm" onSubmit={submit} className="booking-create-layout" noValidate>
         <div>
           <div className="booking-segment mb-3">
             <button
@@ -152,29 +184,7 @@ export function BookingModal({
           </div>
           <h3 className="workflow-heading">Lịch & phòng</h3>
           <div className="row g-3">
-            <div className="col-sm-6">
-              <label className="form-label" htmlFor="bookingBranch">
-                Chi nhánh
-              </label>
-              <select
-                id="bookingBranch"
-                className="form-select"
-                value={branchId}
-                onChange={(e) => {
-                  setBranchId(e.target.value);
-                  setRoom('');
-                  setProducts([]);
-                  setVoucherCode('');
-                }}
-              >
-                {allowed.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-sm-6">
+            <div className="col-12">
               <label className="form-label" htmlFor="bookingType">
                 Loại lưu trú
               </label>
@@ -253,8 +263,10 @@ export function BookingModal({
               </label>
               <select
                 id="bookingRoom"
-                className="form-select"
+                className={`form-select${roomError ? ' is-invalid' : ''}`}
                 required
+                aria-invalid={!!roomError}
+                aria-describedby={roomError ? 'bookingRoomError' : undefined}
                 value={room}
                 onChange={(e) => setRoom(e.target.value)}
               >
@@ -266,6 +278,11 @@ export function BookingModal({
                   </option>
                 ))}
               </select>
+              {roomError && (
+                <div id="bookingRoomError" className="invalid-feedback d-block">
+                  {roomError}
+                </div>
+              )}
               {selectedReason && selectedReason !== true && (
                 <p className="text-danger small mt-1">{selectedReason}</p>
               )}
@@ -279,37 +296,141 @@ export function BookingModal({
           <div className="row g-3">
             <div className="col-sm-6">
               <label className="form-label" htmlFor="bookingCustomer">
-                Tên khách *
+                Tên khách <span className="required-mark">*</span>
               </label>
               <input
                 id="bookingCustomer"
-                className="form-control"
+                className={`form-control${fieldError('customer') ? ' is-invalid' : ''}`}
                 required
                 maxLength={60}
+                autoComplete="name"
+                placeholder="Nguyễn Văn A"
+                aria-invalid={!!fieldError('customer')}
+                aria-describedby={fieldError('customer') ? 'bookingCustomerError' : undefined}
                 value={customer}
                 onChange={(e) => setCustomer(e.target.value)}
+                onBlur={() => touch('customer')}
               />
+              {fieldError('customer') && (
+                <div id="bookingCustomerError" className="invalid-feedback">
+                  {fieldError('customer')}
+                </div>
+              )}
             </div>
             <div className="col-sm-6">
               <label className="form-label" htmlFor="bookingPhone">
-                Số điện thoại (nếu có)
+                Số điện thoại <span className="required-mark">*</span>
               </label>
               <input
                 id="bookingPhone"
-                className="form-control"
+                className={`form-control${fieldError('phone') ? ' is-invalid' : ''}`}
                 type="tel"
+                inputMode="tel"
+                required
+                maxLength={15}
+                autoComplete="tel"
+                placeholder="0901234567"
+                aria-invalid={!!fieldError('phone')}
+                aria-describedby={fieldError('phone') ? 'bookingPhoneError' : undefined}
                 value={phone}
                 onChange={(e) => {
-                  const v = e.target.value;
+                  const v = e.target.value.replace(/[^\d\s+.()-]/g, '');
                   setPhone(v);
-                  const old = data.folios.find(
-                    (f) =>
-                      f.phone.replace(/\D/g, '') === v.replace(/\D/g, '') &&
-                      v.replace(/\D/g, '').length >= 8
-                  );
-                  if (old) setCustomer(old.customer);
+                  const key = normalizePhone(v);
+                  const old =
+                    key.length >= 10 &&
+                    data.folios.find((f) => normalizePhone(f.phone) === key);
+                  if (old && !customer.trim()) setCustomer(old.customer);
                 }}
+                onBlur={() => touch('phone')}
               />
+              {fieldError('phone') && (
+                <div id="bookingPhoneError" className="invalid-feedback">
+                  {fieldError('phone')}
+                </div>
+              )}
+            </div>
+            <div className="col-sm-6">
+              <label className="form-label" htmlFor="bookingEmail">
+                Gmail{' '}
+                {notify === 'email' ? <span className="required-mark">*</span> : '(nếu có)'}
+              </label>
+              <input
+                id="bookingEmail"
+                className={`form-control${fieldError('email') ? ' is-invalid' : ''}`}
+                type="email"
+                inputMode="email"
+                maxLength={100}
+                autoComplete="email"
+                placeholder="ten@gmail.com"
+                aria-invalid={!!fieldError('email')}
+                aria-describedby={fieldError('email') ? 'bookingEmailError' : undefined}
+                value={email}
+                onChange={(e) => setEmail(e.target.value.replace(/\s/g, ''))}
+                onBlur={() => touch('email')}
+              />
+              {fieldError('email') && (
+                <div id="bookingEmailError" className="invalid-feedback">
+                  {fieldError('email')}
+                </div>
+              )}
+            </div>
+            <div className="col-sm-6">
+              <label className="form-label" htmlFor="bookingPassword">
+                Mật khẩu <span className="required-mark">*</span>
+              </label>
+              <input
+                id="bookingPassword"
+                className={`form-control${fieldError('password') ? ' is-invalid' : ''}`}
+                type="text"
+                inputMode="numeric"
+                required
+                minLength={6}
+                maxLength={6}
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={!!fieldError('password')}
+                aria-describedby={fieldError('password') ? 'bookingPasswordError' : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onBlur={() => touch('password')}
+              />
+              {fieldError('password') && (
+                <div id="bookingPasswordError" className="invalid-feedback">
+                  {fieldError('password')}
+                </div>
+              )}
+            </div>
+            <div className="col-12">
+              <span className="form-label d-block" id="bookingNotifyLabel">
+                Gửi thông tin đặt phòng qua
+              </span>
+              <div
+                className="booking-segment"
+                role="radiogroup"
+                aria-labelledby="bookingNotifyLabel"
+              >
+                {(
+                  [
+                    ['zalo', 'bi-chat-dots', 'Zalo'],
+                    ['email', 'bi-envelope', 'Gmail']
+                  ] as const
+                ).map(([value, icon, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={notify === value}
+                    className={notify === value ? 'active' : ''}
+                    onClick={() => {
+                      setNotify(value);
+                      if (value === 'email' && !email) touch('email');
+                    }}
+                  >
+                    <i className={`bi ${icon}`} aria-hidden="true" /> {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="col-12">
               <label className="form-label" htmlFor="bookingNote">
@@ -329,19 +450,6 @@ export function BookingModal({
             <div className="mt-3">
               <ProductPicker branchId={branchId} value={products} onChange={setProducts} />
             </div>
-          </details>
-          <details className="mt-3">
-            <summary>Liên hệ bổ sung</summary>
-            <label className="form-label mt-2" htmlFor="bookingEmail">
-              Email
-            </label>
-            <input
-              id="bookingEmail"
-              className="form-control"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
           </details>
         </div>
         <aside className="booking-price-summary">

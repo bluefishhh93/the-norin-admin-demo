@@ -6,6 +6,7 @@ import { addProducts, validateProducts } from './products';
 import { quoteVoucher } from './voucher';
 import { folioTotal } from '../lib/folio';
 import type { ProductSelection } from '../types';
+import { contactErrors, normalizePhone, type NotifyChannel } from './contact';
 
 export interface BookingInput {
   branchId: string;
@@ -14,6 +15,8 @@ export interface BookingInput {
   customer: string;
   phone: string;
   email: string;
+  password: string;
+  notify: NotifyChannel;
   note: string;
   start: string;
   end: string;
@@ -37,8 +40,8 @@ export const validateBooking = (
       : new Date(v.end);
   const valid = checkRoomInterval(d, room, start, end, v.type);
   if (valid !== true) return valid;
-  if (!v.customer.trim() || (v.phone && !/^\+?[\d\s()-]{8,20}$/.test(v.phone.trim())))
-    return 'Nhập tên khách và kiểm tra số điện thoại.';
+  const contact = Object.values(contactErrors(v))[0];
+  if (contact) return contact;
   const amount = getRoomPrice(d, v.branchId, v.room, v.type, start, end);
   if (amount == null || !Number.isFinite(amount)) return 'Chưa có bảng giá cho phòng này.';
   const productError = validateProducts(d, v.branchId, v.products);
@@ -57,15 +60,17 @@ export const applyBooking = (
 ): string => {
   const room = d.rooms.find((r) => r.branchId === v.branchId && r.number === v.room)!;
   const id = `NR-${d.nextId++}`;
-  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+  const code = v.password;
   const booking: Booking = {
     id,
     branchId: v.branchId,
     room: v.room,
     type: v.type,
-    customer: v.customer.trim(),
-    phone: v.phone.trim(),
-    email: v.email.trim(),
+    customer: v.customer.trim().replace(/\s+/g, ' '),
+    phone: normalizePhone(v.phone.trim()),
+    email: v.email.trim().toLowerCase(),
+    contactMethod: v.notify,
+    zaloPhone: v.notify === 'zalo' ? normalizePhone(v.phone.trim()) : undefined,
     securityCode: code,
     note: v.note.trim(),
     time: '',
@@ -113,6 +118,13 @@ export const applyBooking = (
       {
         at: new Date().toISOString(),
         text: `Tạo booking · ${v.paymentTiming === 'prepaid' ? 'Trả trước' : 'Trả sau'}`
+      },
+      {
+        at: new Date().toISOString(),
+        text:
+          v.notify === 'zalo'
+            ? `Gửi thông tin đặt phòng qua Zalo ${normalizePhone(v.phone.trim())}`
+            : `Gửi thông tin đặt phòng qua Gmail ${v.email.trim().toLowerCase()}`
       }
     ]
   };

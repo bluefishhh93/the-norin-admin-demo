@@ -1,7 +1,7 @@
 import type { RoomClass } from '../../types';
 import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
-import { Field, Select } from '../../components/Form';
+import { Field } from '../../components/Form';
 import { defaultBranch, isAllowedBranch, scoped } from '../../lib/scope';
 
 const BASE_STEPS = [
@@ -17,22 +17,12 @@ export const useScopedClasses = () => {
 export function useClassForms() {
   const { data, update, toast } = useStore();
   const modal = useModal();
-  const branchOpts = data.branches
-    .filter((b) => isAllowedBranch(data, b.id))
-    .map((b) => [b.id, b.name] as [string, string]);
-
   const editClass = (item?: RoomClass) =>
     modal.openForm({
       title: item ? 'Sửa hạng phòng' : 'Tạo hạng phòng',
       body: (
         <>
-          <Select
-            label="Chi nhánh"
-            name="branchId"
-            options={branchOpts}
-            defaultValue={item?.branchId ?? defaultBranch(data)}
-            required
-          />
+          <input type="hidden" name="branchId" value={item?.branchId ?? defaultBranch(data)} />
           <Field
             label="Tên hạng"
             name="name"

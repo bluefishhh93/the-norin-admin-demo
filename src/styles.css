@@ -88,36 +88,6 @@ h1 {
   padding-bottom: 3px;
 }
 
-.select-wrap {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid #e8e9ed;
-  background: #fff;
-  border-radius: 8px;
-  padding: 0 12px;
-  height: 38px;
-  color: #999faa;
-  white-space: nowrap;
-}
-
-.select-wrap select {
-  border: 0;
-  background: transparent;
-  outline: none;
-  appearance: none;
-  color: #434c5a;
-  font-weight: 600;
-  min-width: 118px;
-  max-width: 210px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.select-chevron {
-  font-size: 10px;
-}
-
 .btn-primary-custom {
   border: 1px solid var(--accent);
   border-radius: 8px;
@@ -139,6 +109,30 @@ h1 {
 
 .btn-primary-custom:hover {
   background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+.btn-outline-custom {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-dark);
+  min-height: 38px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+
+.btn-outline-custom:hover {
+  background: var(--accent-light);
   transform: translateY(-1px);
 }
 
@@ -532,18 +526,8 @@ h1 {
     width: 100%;
   }
 
-  .select-wrap {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .select-wrap select {
-    min-width: 0;
-    max-width: 100%;
-    flex: 1;
-  }
-
-  .btn-primary-custom {
+  .btn-primary-custom,
+  .btn-outline-custom {
     padding: 0 11px;
   }
 

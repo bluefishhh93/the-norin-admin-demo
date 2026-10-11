@@ -1,63 +1,57 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Room, StayType } from '../../types';
+import type { Room } from '../../types';
 import { useStore } from '../../store';
 import { useBooking } from '../../booking/context';
-import { branchName, fmtDateTime } from '../../lib/format';
+import { fmtDateTime, moneyComma } from '../../lib/format';
 import { scoped } from '../../lib/scope';
-import { bookingInterval, className, roomBusy, roomKey, stayWindow } from '../../lib/rooms';
+import { bookingInterval, className, getRoomPrice, roomKey } from '../../lib/rooms';
 import {
-  blockReason,
   bookingState,
   buildCells,
-  calendarColumns,
+  clockOf,
   dateKey,
   hourlyColumns,
+  stayColumns,
+  VIEW_STAY,
   type TimelineView
 } from './timeline';
+import { blockedIn, nextSelection, type Selection } from './selection';
 import './booking-rooms.css';
 
-const VIEW_LABELS = { day: 'Ngày', week: 'Tuần', month: 'Tháng' };
+const VIEW_LABELS: Record<TimelineView, string> = { hour: 'Giờ', night: 'Đêm', day: 'Ngày' };
 const dateTime = (ms: number) => fmtDateTime(new Date(ms).toISOString());
-const floorOf = (number: string) => number.slice(0, -2) || '1';
-
 export function RoomTimeline({ rooms }: { rooms: Room[] }) {
   const { data, toast } = useStore();
   const { openBooking, openDetail } = useBooking();
-  const [view, setView] = useState<TimelineView>('day');
+  const [view, setView] = useState<TimelineView>('hour');
   const [day, setDay] = useState(() => dateKey(new Date()));
-  const [stay, setStay] = useState<StayType>('Theo giờ');
-  const allowedRooms = scoped(data, rooms);
-  const branches = [...new Set(allowedRooms.map((room) => room.branchId))];
-  const [branch, setBranch] = useState(() => branches[0] || 'all');
-  const [floor, setFloor] = useState('all');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const hourly = view === 'hour';
+  const branchRooms = scoped(data, rooms);
   const [category, setCategory] = useState('all');
   const [now, setNow] = useState(Date.now);
   const scroll = useRef<HTMLDivElement>(null);
-  const selectedBranch =
-    branches.includes(branch) || branch === 'all' ? branch : branches[0] || 'all';
-  const branchRooms = allowedRooms.filter(
-    (room) => selectedBranch === 'all' || room.branchId === selectedBranch
-  );
-  const floors = [...new Set(branchRooms.map((room) => floorOf(room.number)))].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
   const categories = [...new Set(branchRooms.map((room) => room.classId))];
+  const classOrder = (id: string) => {
+    const i = data.classes.findIndex((c) => c.id === id);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
   const visibleRooms = branchRooms
-    .filter(
-      (room) =>
-        (floor === 'all' || floorOf(room.number) === floor) &&
-        (category === 'all' || room.classId === category)
-    )
+    .filter((room) => category === 'all' || room.classId === category)
     .sort(
       (a, b) =>
         a.branchId.localeCompare(b.branchId) ||
+        classOrder(a.classId) - classOrder(b.classId) ||
         a.number.localeCompare(b.number, undefined, { numeric: true })
     );
   const cols = useMemo(
-    () => (view === 'day' ? hourlyColumns(day) : calendarColumns(day, view)),
-    [view, day]
+    () =>
+      view === 'hour'
+        ? hourlyColumns(day)
+        : stayColumns(data, day, view === 'night' ? 'Qua đêm' : 'Theo ngày'),
+    [view, day, data]
   );
-  const colWidth = view === 'day' ? 68 : view === 'week' ? 170 : 130;
+  const colWidth = hourly ? 68 : 124;
   const labelWidth = 180;
   const width = labelWidth + cols.length * colWidth;
   const gridStyle = {
@@ -67,51 +61,114 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
   const nowPosition =
     labelWidth +
     ((now - cols[0].start) / (cols[cols.length - 1].end - cols[0].start)) * cols.length * colWidth;
+  const rowCells = useMemo(
+    () =>
+      new Map(
+        visibleRooms.map((room) => [
+          roomKey(room),
+          buildCells(data, room, cols, now, hourly ? 'end' : 'start')
+        ])
+      ),
+    [visibleRooms, data, cols, now, hourly]
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (scroll.current)
-      scroll.current.scrollLeft =
-        view === 'day' && day === dateKey(new Date())
-          ? Math.max(0, ((Date.now() - cols[0].start) / 1800000) * colWidth - colWidth * 2)
-          : 0;
-  }, [view, day, cols, colWidth]);
-
+    setSelection(null);
+  }, [view, day, category]);
+  useEffect(() => {
+    if (!scroll.current) return;
+    const todayIndex = cols.findIndex((c) => c.key === today || c.key.startsWith(`${today}-`));
+    scroll.current.scrollLeft = hourly
+      ? day === today
+        ? Math.max(0, ((Date.now() - cols[0].start) / 1800000) * colWidth - colWidth * 2)
+        : 0
+      : Math.max(0, (todayIndex - 1) * colWidth);
+  }, [view, day, cols, colWidth, hourly, today]);
   const shift = (amount: number) => {
     const date = new Date(`${day}T00:00:00`);
-    if (view === 'month') {
+    if (hourly) date.setDate(date.getDate() + amount);
+    else {
       date.setDate(1);
       date.setMonth(date.getMonth() + amount);
-    } else date.setDate(date.getDate() + amount * (view === 'week' ? 7 : 1));
+    }
     setDay(dateKey(date));
   };
-  const drill = (key: string) => {
-    setDay(key);
-    setView('day');
+
+  const selectedRoom = selection
+    ? visibleRooms.find((room) => roomKey(room) === selection.roomKey)
+    : undefined;
+  const range = selection && {
+    start: cols[selection.from].start,
+    end: cols[selection.to].end
   };
-  const pick = (room: Room, start: number) => {
-    const from = new Date(Math.max(start, Date.now()));
-    const [presetStart, end] =
-      stay === 'Theo giờ'
-        ? [from, new Date(from.getTime() + 2 * 3600000)]
-        : stayWindow(data, stay, dateKey(from));
+  const hours = range ? (range.end - range.start) / 3600000 : 0;
+  const units = selection ? (hourly ? hours : selection.to - selection.from + 1) : 0;
+  const unitLabel = hourly ? 'giờ' : view === 'night' ? 'đêm' : 'ngày';
+  const minSlots = 4;
+  const maxSlots = data.rules.maxHourlyStay * 2;
+  const price =
+    selectedRoom && range
+      ? getRoomPrice(
+          data,
+          selectedRoom.branchId,
+          selectedRoom.number,
+          VIEW_STAY[view],
+          new Date(range.start),
+          new Date(range.end)
+        )
+      : null;
+  const canShrink = !!selection && (hourly ? units > 2 : view === 'day' && units > 1);
+  const canGrow =
+    !!selection && (hourly ? units < data.rules.maxHourlyStay : view === 'day');
+
+  const choose = (room: Room, index: number) => {
+    const key = roomKey(room);
+    const result = nextSelection(
+      view,
+      selection,
+      key,
+      index,
+      rowCells.get(key) || [],
+      minSlots,
+      maxSlots
+    );
+    if (typeof result === 'string') toast(result);
+    else setSelection(result);
+  };
+
+  const step = (delta: number) => {
+    if (!selection) return;
+    const to = selection.to + delta * (hourly ? 2 : 1);
+    const blocked = blockedIn(rowCells.get(selection.roomKey) || [], selection.from, to);
+    if (delta > 0 && blocked) {
+      toast(blocked);
+      return;
+    }
+    setSelection({ ...selection, to });
+  };
+
+  const confirm = () => {
+    if (!selectedRoom || !range) return;
+    const start = hourly ? Math.max(range.start, Date.now()) : range.start;
     openBooking({
-      branchId: room.branchId,
-      room: room.number,
-      type: stay,
-      start: presetStart,
-      end
+      branchId: selectedRoom.branchId,
+      room: selectedRoom.number,
+      type: VIEW_STAY[view],
+      start: new Date(start),
+      end: new Date(hourly ? start + hours * 3600000 : range.end)
     });
+    setSelection(null);
   };
 
   return (
     <div className="booking-room-timeline">
       <div className="booking-timeline-toolbar">
-        <div className="booking-timeline-views" aria-label="Chế độ lịch">
-          {(['day', 'week', 'month'] as const).map((value) => (
+        <div className="booking-timeline-views" aria-label="Loại lưu trú">
+          {(['hour', 'night', 'day'] as const).map((value) => (
             <button
               type="button"
               key={value}
@@ -127,26 +184,26 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           <button
             type="button"
             className="btn btn-light"
-            aria-label={`${VIEW_LABELS[view]} trước`}
+            aria-label={hourly ? 'Ngày trước' : 'Tháng trước'}
             onClick={() => shift(-1)}
           >
             <i className="bi bi-chevron-left" aria-hidden="true" />
           </button>
           <label>
-            <span className="visually-hidden">Ngày đang xem</span>
+            <span className="visually-hidden">{hourly ? 'Ngày đang xem' : 'Tháng đang xem'}</span>
             <input
               className="form-control"
-              type={view === 'month' ? 'month' : 'date'}
-              value={view === 'month' ? day.slice(0, 7) : day}
+              type={hourly ? 'date' : 'month'}
+              value={hourly ? day : day.slice(0, 7)}
               onChange={(e) =>
-                e.target.value && setDay(view === 'month' ? `${e.target.value}-01` : e.target.value)
+                e.target.value && setDay(hourly ? e.target.value : `${e.target.value}-01`)
               }
             />
           </label>
           <button
             type="button"
             className="btn btn-light"
-            aria-label={`${VIEW_LABELS[view]} sau`}
+            aria-label={hourly ? 'Ngày sau' : 'Tháng sau'}
             onClick={() => shift(1)}
           >
             <i className="bi bi-chevron-right" aria-hidden="true" />
@@ -163,36 +220,6 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           </button>
         </div>
         <label>
-          Chi nhánh
-          <select
-            className="form-select"
-            value={selectedBranch}
-            onChange={(e) => {
-              setBranch(e.target.value);
-              setFloor('all');
-              setCategory('all');
-            }}
-          >
-            <option value="all">Tất cả chi nhánh</option>
-            {branches.map((id) => (
-              <option key={id} value={id}>
-                {branchName(data, id)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Tầng
-          <select className="form-select" value={floor} onChange={(e) => setFloor(e.target.value)}>
-            <option value="all">Tất cả tầng</option>
-            {floors.map((value) => (
-              <option key={value} value={value}>
-                Tầng {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
           Hạng phòng
           <select
             className="form-select"
@@ -207,26 +234,14 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
             ))}
           </select>
         </label>
-        {view === 'day' && (
-          <label>
-            Loại booking mới
-            <select
-              className="form-select"
-              value={stay}
-              onChange={(e) => setStay(e.target.value as StayType)}
-            >
-              <option>Theo giờ</option>
-              <option>Qua đêm</option>
-              <option>Theo ngày</option>
-            </select>
-          </label>
-        )}
       </div>
       <p className="booking-timeline-hint">
-        {view === 'day'
-          ? 'Bấm ô trống để mở form với phòng và lịch gợi ý; có thể sửa trong form. Bấm ô bị chặn để xem lý do.'
-          : 'Bấm một ngày để xem lịch theo giờ; ngày có booking vẫn có thể còn khoảng trống.'}{' '}
-        Luôn hiển thị mọi loại lưu trú · Dọn dự kiến {data.rules.cleaningBuffer} phút sau mỗi lượt.
+        {view === 'hour'
+          ? `Bấm giờ bắt đầu, hệ thống chọn sẵn 2 tiếng. Bấm ô xa hơn hoặc dùng nút +/− để đổi số giờ (tối đa ${data.rules.maxHourlyStay} tiếng), rồi bấm Xác nhận.`
+          : view === 'night'
+            ? `Qua đêm cố định ${data.timeSetting.nightCheckIn} → ${data.timeSetting.nightCheckOut} hôm sau, chỉ chọn 1 đêm. Bấm ô trống rồi bấm Xác nhận.`
+            : `Theo ngày nhận ${data.timeSetting.dayCheckIn}, trả ${data.timeSetting.dayCheckOut} hôm sau. Bấm ngày đầu và ngày cuối để chọn nhiều ngày, sau đó bấm Xác nhận.`}{' '}
+        Ô dọn phòng {data.rules.cleaningBuffer} phút ở trước và sau mỗi booking.
       </p>
       <div className="booking-timeline-legend">
         <span className="confirmed">Đã xác nhận</span>
@@ -235,7 +250,65 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
         <span className="cleaning">Dọn phòng</span>
         <span className="blocked">Khóa bán</span>
         <span className="past">Đã qua</span>
+        <span className="selected">Đang chọn</span>
       </div>
+      {selection && selectedRoom && range && (
+        <div className="booking-timeline-confirm" role="status">
+          <span className="booking-timeline-confirm-icon" aria-hidden="true">
+            <i className={`bi ${hourly ? 'bi-clock' : view === 'night' ? 'bi-moon-stars' : 'bi-sun'}`} />
+          </span>
+          <div className="booking-timeline-confirm-info">
+            <strong>
+              {selectedRoom.name} · {VIEW_STAY[view]}
+            </strong>
+            <span>
+              {dateTime(range.start)} → {dateTime(range.end)}
+            </span>
+          </div>
+          {(hourly || view === 'day') && (
+            <div className="booking-timeline-stepper" aria-label={`Số ${unitLabel}`}>
+              <button
+                type="button"
+                aria-label={`Bớt 1 ${unitLabel}`}
+                disabled={!canShrink}
+                onClick={() => step(-1)}
+              >
+                <i className="bi bi-dash" aria-hidden="true" />
+              </button>
+              <span>
+                {units} {unitLabel}
+              </span>
+              <button
+                type="button"
+                aria-label={`Thêm 1 ${unitLabel}`}
+                disabled={!canGrow}
+                onClick={() => step(1)}
+              >
+                <i className="bi bi-plus" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {view === 'night' && <span className="booking-timeline-chip">1 đêm</span>}
+          {price !== null && (
+            <div className="booking-timeline-confirm-price">
+              <small>Tạm tính</small>
+              <strong>{moneyComma(price)}</strong>
+            </div>
+          )}
+          <div className="booking-timeline-confirm-actions">
+            <button
+              type="button"
+              className="btn btn-light"
+              onClick={() => setSelection(null)}
+            >
+              Bỏ chọn
+            </button>
+            <button type="button" className="btn btn-primary-custom" onClick={confirm}>
+              <i className="bi bi-check2" aria-hidden="true" /> Xác nhận
+            </button>
+          </div>
+        </div>
+      )}
       {!visibleRooms.length ? (
         <div className="room-board-empty">Không có phòng phù hợp với bộ lọc.</div>
       ) : (
@@ -247,15 +320,18 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
         >
           <div className="booking-timeline-grid" style={{ width }}>
             <div className="booking-timeline-head" style={gridStyle}>
-              <div className="booking-timeline-room">Chi nhánh / Phòng</div>
+              <div className="booking-timeline-room">Hạng phòng / Phòng</div>
               {cols.map((c) => (
-                <div key={c.key} className={dateKey(new Date(c.start)) === today ? 'today' : ''}>
+                <div
+                  key={c.key}
+                  className={dateKey(new Date(c.start)) === today && !hourly ? 'today' : ''}
+                >
                   <strong>{c.label}</strong>
                   {c.sub && <small>{c.sub}</small>}
                 </div>
               ))}
             </div>
-            {view === 'day' && day === today && (
+            {hourly && day === today && (
               <div
                 className="booking-timeline-now"
                 style={{ left: nowPosition }}
@@ -265,163 +341,101 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
               </div>
             )}
             {visibleRooms.map((room, index) => {
+              const key = roomKey(room);
+              const prev = visibleRooms[index - 1];
               const newGroup =
-                index === 0 ||
-                visibleRooms[index - 1].branchId !== room.branchId ||
-                floorOf(visibleRooms[index - 1].number) !== floorOf(room.number);
-              const busy = roomBusy(data, room);
+                !prev || prev.branchId !== room.branchId || prev.classId !== room.classId;
+              const groupCount = newGroup
+                ? visibleRooms.filter(
+                    (r) => r.branchId === room.branchId && r.classId === room.classId
+                  ).length
+                : 0;
+              const rowSelected = selection?.roomKey === key;
               return (
-                <div key={roomKey(room)}>
+                <div key={key}>
                   {newGroup && (
                     <div className="booking-timeline-group">
                       <span>
-                        {branchName(data, room.branchId)} · Tầng {floorOf(room.number)}
+                        <strong>{className(data, room)}</strong>
+                        <em>{groupCount} phòng</em>
                       </span>
                     </div>
                   )}
                   <div
-                    className={`booking-timeline-row ${view !== 'day' ? 'overview' : ''}`}
+                    className={`booking-timeline-row${rowSelected ? ' is-selecting' : ''}`}
                     style={gridStyle}
                   >
                     <div className="booking-timeline-room">
-                      <strong>Phòng {room.number}</strong>
-                      <small>{className(data, room)}</small>
+                      <strong>{room.name || `Phòng ${room.number}`}</strong>
+                      <small>Số phòng {room.number}</small>
                     </div>
-                    {view === 'day'
-                      ? buildCells(data, room, cols, now).map((c) => {
-                          if ((c.kind === 'booked' || c.kind === 'cleaning') && !c.head)
-                            return null;
-                          const style = c.span ? { gridColumn: `span ${c.span}` } : undefined;
-                          const range = c.booking && bookingInterval(data, c.booking);
-                          const overdue =
-                            c.booking?.status === 'checked-in' && range && range[1] < now;
-                          const label = `Phòng ${room.number} · ${dateTime(c.start)} · ${c.reason}${range ? ` · ${dateTime(range[0])} → ${dateTime(range[1])}` : ''}${overdue ? ' · Quá giờ trả phòng' : ''}`;
-                          return (
-                            <button
-                              type="button"
-                              key={c.key}
-                              className={`booking-timeline-cell ${c.kind} ${c.booking && c.kind === 'booked' ? c.booking.status : ''}`}
-                              style={style}
-                              title={label}
-                              aria-label={label}
-                              onClick={() =>
-                                c.kind === 'booked' && c.booking
-                                  ? openDetail(c.booking.id)
-                                  : c.kind === 'open'
-                                    ? pick(room, c.start)
-                                    : toast(c.reason)
-                              }
-                            >
-                              {c.kind === 'booked' && c.booking ? (
-                                <>
-                                  <strong>
-                                    {c.continuesBefore ? '← ' : ''}
-                                    {c.booking.id}
-                                    {c.continuesAfter ? ' →' : ''}
-                                  </strong>
-                                  <span>{c.booking.customer}</span>
-                                  <small>
-                                    {bookingState(c.booking)}
-                                    {overdue ? ' · Quá giờ' : ''}
-                                  </small>
-                                </>
-                              ) : c.kind === 'cleaning' ? (
-                                <span>Dọn</span>
-                              ) : c.kind === 'blocked' ? (
-                                <span>Khóa</span>
-                              ) : null}
-                            </button>
-                          );
-                        })
-                      : cols.map((c) => {
-                          const reservations = busy.filter(
-                            (b) => c.start < b.end && c.end > b.start
-                          );
-                          const blocked = blockReason(data, room, c.start, c.end);
-                          const cleaningRanges = busy.filter(
-                            (b) =>
-                              b.end < c.end && b.end + data.rules.cleaningBuffer * 60000 > c.start
-                          );
-                          return (
-                            <div
-                              className={`booking-timeline-day ${blocked ? 'blocked' : ''} ${c.end <= now ? 'past' : ''}`}
-                              key={c.key}
-                            >
-                              <button
-                                type="button"
-                                className="booking-timeline-drill"
-                                title={`Xem lịch theo giờ: phòng ${room.number}, ${c.label}`}
-                                aria-label={`Xem ngày ${c.label}, phòng ${room.number}${blocked ? `, ${blocked}` : ''}`}
-                                onClick={() => drill(c.key)}
-                              >
-                                {reservations.length
-                                  ? `${reservations.length} lượt · Xem ngày`
-                                  : 'Xem ngày'}
-                              </button>
-                              {reservations.map(({ booking, start, end }) => (
-                                <button
-                                  type="button"
-                                  key={booking.id}
-                                  className={`booking-timeline-reservation ${booking.status}`}
-                                  onClick={() => openDetail(booking.id)}
-                                  title={`${booking.id} · ${booking.customer} · ${bookingState(booking)} · ${dateTime(start)} → ${dateTime(end)}`}
-                                >
-                                  <strong>
-                                    {start < c.start ? '← ' : ''}
-                                    {booking.id}
-                                    {end > c.end ? ' →' : ''}
-                                  </strong>
-                                  <span>{bookingState(booking)}</span>
-                                  <small>
-                                    {new Date(Math.max(start, c.start)).toLocaleTimeString(
-                                      'vi-VN',
-                                      { hour: '2-digit', minute: '2-digit' }
-                                    )}{' '}
-                                    →{' '}
-                                    {end >= c.end
-                                      ? '24:00'
-                                      : new Date(end).toLocaleTimeString('vi-VN', {
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                  </small>
-                                </button>
-                              ))}
-                              {cleaningRanges.map((range) => (
-                                <span
-                                  key={`clean-${range.booking.id}`}
-                                  className="booking-timeline-clean-note"
-                                  title={`Dọn sau ${range.booking.id}: ${dateTime(range.end)} → ${dateTime(range.end + data.rules.cleaningBuffer * 60000)}`}
-                                >
-                                  Dọn {data.rules.cleaningBuffer} phút sau{' '}
-                                  {new Date(range.end).toLocaleTimeString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              ))}
-                              {blocked && (
-                                <button
-                                  type="button"
-                                  className="booking-timeline-block-reason"
-                                  onClick={() => toast(blocked)}
-                                >
-                                  Khóa bán · Xem lý do
-                                </button>
-                              )}
-                              {room.status === 'cleaning' &&
-                                c.end > now &&
-                                c.start <
-                                  (room.cleaningReadyAt
-                                    ? Date.parse(room.cleaningReadyAt)
-                                    : now + data.rules.cleaningBuffer * 60000) && (
-                                  <span className="booking-timeline-clean-note">
-                                    {room.cleaningReadyAt ? 'Đang dọn' : 'Chờ dọn'}
-                                  </span>
-                                )}
-                            </div>
-                          );
-                        })}
+                    {(rowCells.get(key) || []).map((c, i) => {
+                      if ((c.kind === 'booked' || c.kind === 'cleaning') && !c.head) return null;
+                      const style = c.span ? { gridColumn: `span ${c.span}` } : undefined;
+                      const stay = c.booking && bookingInterval(data, c.booking);
+                      const overdue =
+                        c.booking?.status === 'checked-in' && stay && stay[1] < now;
+                      if (rowSelected && selection && i > selection.from && i <= selection.to)
+                        return null;
+                      if (rowSelected && selection && i === selection.from && range)
+                        return (
+                          <button
+                            type="button"
+                            key={c.key}
+                            className="booking-timeline-pick"
+                            style={{ gridColumn: `span ${selection.to - selection.from + 1}` }}
+                            aria-label={`Bỏ chọn ${room.name} · ${dateTime(range.start)} → ${dateTime(range.end)}`}
+                            onClick={() => setSelection(null)}
+                          >
+                            <strong>
+                              {units} {unitLabel}
+                            </strong>
+                            <small>
+                              {clockOf(range.start)} → {clockOf(range.end)}
+                            </small>
+                            <i className="bi bi-x" aria-hidden="true" />
+                          </button>
+                        );
+                      const label = `Phòng ${room.number} · ${dateTime(c.start)} · ${c.reason}${stay ? ` · ${dateTime(stay[0])} → ${dateTime(stay[1])}` : ''}${overdue ? ' · Quá giờ trả phòng' : ''}`;
+                      return (
+                        <button
+                          type="button"
+                          key={c.key}
+                          className={`booking-timeline-cell ${c.kind} ${c.booking && c.kind === 'booked' ? c.booking.status : ''}`}
+                          style={style}
+                          title={label}
+                          aria-label={label}
+                          onClick={() =>
+                            c.kind === 'booked' && c.booking
+                              ? openDetail(c.booking.id)
+                              : c.kind === 'open'
+                                ? choose(room, i)
+                                : toast(c.reason)
+                          }
+                        >
+                          {c.kind === 'booked' && c.booking ? (
+                            <>
+                              <strong>
+                                {c.continuesBefore ? '← ' : ''}
+                                {c.booking.id}
+                                {c.continuesAfter ? ' →' : ''}
+                              </strong>
+                              <span>{c.booking.customer}</span>
+                              <small>
+                                {bookingState(c.booking)}
+                                {overdue ? ' · Quá giờ' : ''}
+                              </small>
+                            </>
+                          ) : c.kind === 'cleaning' ? (
+                            <span>Dọn</span>
+                          ) : c.kind === 'blocked' ? (
+                            <span>Khóa</span>
+                          ) : c.kind === 'open' ? (
+                            <i className="bi bi-plus" aria-hidden="true" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );

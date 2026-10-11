@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
@@ -16,21 +15,12 @@ import {
 import type { DemoData } from '../../types';
 
 function BlockFields({ data }: { data: DemoData }) {
-  const [branchId, setBranchId] = useState(defaultBranch(data));
-  const branches = data.branches.filter((b) => isAllowedBranch(data, b.id));
+  const branchId = defaultBranch(data);
   const classes = data.classes.filter((c) => c.branchId === branchId);
   return (
     <>
+      <input type="hidden" name="branchId" value={branchId} />
       <Select
-        label="Chi nhánh"
-        name="branchId"
-        options={branches.map((b) => [b.id, b.name])}
-        value={branchId}
-        onChange={(e) => setBranchId(e.target.value)}
-        required
-      />
-      <Select
-        key={branchId}
         label="Hạng phòng"
         name="classId"
         options={classes.map((c) => [c.id, c.name])}

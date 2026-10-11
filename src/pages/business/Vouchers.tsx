@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName, money } from '../../lib/format';
-import { scopedWithAll, isAllowedBranch } from '../../lib/scope';
+import { defaultBranch, scopedWithAll, isAllowedBranch } from '../../lib/scope';
 import { DataTable, Panel, PrimaryButton, ScopeNote, TextLink, Toolbar } from '../../components/ui';
 
 const WEEKDAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -99,20 +99,12 @@ export function Vouchers() {
   };
 
   const openForm = (voucher?: Voucher) => {
-    const branchOpts: [string, string][] = data.branches
-      .filter(b => isAllowedBranch(data, b.id))
-      .map(b => [b.id, b.name]);
     const selectedDays = voucher?.weekdays ?? [1, 2, 3, 4, 5, 6, 7];
     modal.openForm({
       title: voucher ? 'Sửa voucher' : 'Tạo voucher',
       body: (
         <>
-          <Select
-            label="Phạm vi chi nhánh"
-            name="branchId"
-            options={branchOpts}
-            defaultValue={voucher?.branchId ?? branchOpts[0][0]}
-          />
+          <input type="hidden" name="branchId" value={voucher?.branchId ?? defaultBranch(data)} />
           <Field
             label="Tên chương trình"
             name="name"

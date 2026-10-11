@@ -3,9 +3,27 @@ export type RoomStatus = 'available' | 'occupied' | 'cleaning' | 'reserved';
 export type BookingStatus =
   'confirmed' | 'checked-in' | 'checked-out' | 'pending' | 'cancelled' | 'no-show';
 export type PaymentTiming = 'prepaid' | 'postpaid';
+export type GuestIdType = 'id_card' | 'passport';
+export type GuestGender = 'Male' | 'Female';
 export interface BookingGuest {
-  name: string;
-  document: string;
+  fullName: string;
+  dateOfBirth: string;
+  gender: GuestGender | '';
+  idType: GuestIdType;
+  idNumber: string;
+  nationality?: string;
+  address: string;
+  issueDate: string;
+  expiryDate: string;
+  idCardPhoto?: string;
+  idCardAvatar?: string;
+}
+export interface RoomCard {
+  uid: string;
+  lockId: number | null;
+  issuedAt: string;
+  validFrom: string;
+  validTo: string;
 }
 export type StayType = 'Theo giờ' | 'Qua đêm' | 'Theo ngày';
 export type PriceType = 'Ngày đêm' | 'Qua đêm' | 'Giờ';
@@ -260,6 +278,7 @@ export interface Folio {
   outcome?: 'cancelled' | 'no-show';
   note?: string;
   guests?: BookingGuest[];
+  roomCards?: RoomCard[];
   actualCheckInAt?: string;
   securityCode?: string;
   voucher?: AppliedVoucher;

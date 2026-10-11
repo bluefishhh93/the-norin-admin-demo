@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { useBooking } from './context';
 import { useBookingActions } from './actions';
 import { paymentTiming, refundable, statusLabel } from './model';
-import { branchName, fmtDateTime, money } from '../lib/format';
+import { branchName, fmtDateTime, fmtTime, money } from '../lib/format';
 import { checkoutAt, folioDue, folioPaid, folioTotal, isActive } from '../lib/folio';
 import { className } from '../lib/rooms';
 import { Tabs } from '../components/ui';
@@ -13,8 +13,14 @@ import { BookingProducts } from './BookingProducts';
 import { BookingTask, type BookingTaskKind } from './BookingTask';
 import { BookingCosts } from './BookingCosts';
 import { BookingGuests } from './BookingGuests';
+import { CheckinModal } from './CheckinModal';
+import { GuestModal } from './GuestModal';
+import { IssueCardModal } from './IssueCardModal';
+import { BookingStayPanel } from './BookingStayPanel';
+import { STAY_ICON, fmtDay, stayLength } from './stay';
 
 type DetailTab = 'Tổng quan' | 'Sản phẩm' | 'Chi phí & thanh toán' | 'Khách lưu trú' | 'Lịch sử';
+type DetailModal = 'checkin' | 'card' | 'guests';
 
 export function BookingDetail({ b }: { b: Folio }) {
   const { data, toast } = useStore();
@@ -22,9 +28,9 @@ export function BookingDetail({ b }: { b: Folio }) {
   const act = useBookingActions();
   const { collect } = useFolioDialogs();
   const [tab, setTab] = useState<DetailTab>('Tổng quan');
-  const [task, setTask] = useState<BookingTaskKind | null>(initialCheckin ? 'checkin' : null);
+  const [task, setTask] = useState<BookingTaskKind | null>(null);
+  const [modal, setModal] = useState<DetailModal | null>(initialCheckin ? 'checkin' : null);
   const [note, setNote] = useState(b.note ?? '');
-  const [showSecret, setShowSecret] = useState(false);
   const active = isActive(b);
   const pending = active && b.detailStatus === 1;
   const inHouse = active && b.detailStatus === 2;
@@ -45,6 +51,11 @@ export function BookingDetail({ b }: { b: Folio }) {
     clearInitialCheckin();
     setTask(value);
   };
+  const closeModal = () => {
+    setModal(null);
+    clearInitialCheckin();
+  };
+  const lock = data.locks.find((l) => l.branchId === b.branchId && l.room === b.room);
   const copy = async () => {
     const text = `${b.code} · ${branchName(data, b.branchId)} · Phòng ${b.room}\n${b.customer}\n${fmtDateTime(b.effectiveCheckInTime)} → ${fmtDateTime(checkoutAt(b))}\nTổng: ${money(folioTotal(b))} · ${paymentTiming(b) === 'prepaid' ? 'Trả trước' : 'Trả sau'}`;
     try {
@@ -79,8 +90,14 @@ export function BookingDetail({ b }: { b: Folio }) {
             </button>
           )}
           {pending && b.status === 1 && (
-            <button className="btn-primary-custom" onClick={() => open('checkin')}>
+            <button className="btn-primary-custom" onClick={() => setModal('checkin')}>
               Nhận phòng
+            </button>
+          )}
+          {inHouse && (
+            <button className="btn btn-light" onClick={() => setModal('guests')}>
+              <i className="bi bi-person-vcard" />{' '}
+              {b.guests?.length ? 'Thông tin khách' : 'Nhập thông tin khách'}
             </button>
           )}
           {inHouse && (
@@ -128,7 +145,7 @@ export function BookingDetail({ b }: { b: Folio }) {
           <small>Đã thanh toán</small>
           <strong>{money(folioPaid(b))}</strong>
         </div>
-        <div>
+        <div className={!refund && active && due > 0 ? 'owe' : undefined}>
           <small>{refund > 0 ? 'Cần hoàn' : 'Còn phải thu'}</small>
           <strong>{money(refund || (b.status === 3 ? 0 : due))}</strong>
         </div>
@@ -145,58 +162,84 @@ export function BookingDetail({ b }: { b: Folio }) {
       <div className="panel p-4 mt-3">
         {tab === 'Tổng quan' && (
           <>
-            <div className="booking-overview-grid">
-              <div>
-                <small>Khách liên hệ</small>
-                <strong>{b.customer}</strong>
-                <span>{b.phone || 'Chưa có số điện thoại'}</span>
-              </div>
-              <div>
-                <small>Nhận → trả hiệu lực</small>
-                <strong>{fmtDateTime(b.effectiveCheckInTime)}</strong>
-                <span>→ {fmtDateTime(checkoutAt(b))}</span>
-              </div>
-              <div>
-                <small>Nhận / trả thực tế</small>
-                <span>
-                  {b.actualCheckInAt
-                    ? fmtDateTime(b.actualCheckInAt)
-                    : inHouse
-                      ? 'Đã nhận (dữ liệu cũ)'
-                      : 'Chưa nhận'}
+            <div className="bd-overview">
+              <div className="bd-guest">
+                <span className="bd-avatar" aria-hidden="true">
+                  {b.customer.trim().charAt(0).toUpperCase() || '?'}
                 </span>
-                <span>{b.actualCheckOutAt ? fmtDateTime(b.actualCheckOutAt) : 'Chưa trả'}</span>
-              </div>
-              <div>
-                <small>Truy cập phòng</small>
-                <span>
-                  {inHouse
-                    ? `Hiệu lực đến ${fmtDateTime(checkoutAt(b))}`
-                    : 'Chưa có quyền đang sử dụng'}
-                </span>
+                <div className="bd-guest-info">
+                  <strong>{b.customer}</strong>
+                  {b.phone ? <a href={`tel:${b.phone.replace(/\s/g, '')}`}>{b.phone}</a> : <span>—</span>}
+                </div>
                 {b.securityCode && (
-                  <button
-                    className="btn btn-link p-0 text-start"
-                    onClick={() => setShowSecret((v) => !v)}
-                  >
-                    Mã nhận phòng: {showSecret ? b.securityCode : '••••••'}
-                  </button>
+                  <div className="bd-pin">
+                    <small>Mật khẩu</small>
+                    <strong>{b.securityCode}</strong>
+                  </div>
                 )}
+              </div>
+              <div className="bd-stay">
+                <div className="bd-stay-point">
+                  <small>Nhận phòng</small>
+                  <strong>{fmtTime(b.effectiveCheckInTime)}</strong>
+                  <span>{fmtDay(b.effectiveCheckInTime)}</span>
+                  {(b.actualCheckInAt || inHouse) && (
+                    <em>
+                      <i className="bi bi-check2" aria-hidden="true" /> Đã nhận
+                      {b.actualCheckInAt ? ` ${fmtTime(b.actualCheckInAt)}` : ''}
+                    </em>
+                  )}
+                </div>
+                <div className="bd-stay-line">
+                  <span className="bd-stay-type">
+                    <i className={`bi ${STAY_ICON[b.stayType]}`} aria-hidden="true" /> {b.stayType}
+                  </span>
+                  <small>{stayLength(b.stayType, b.effectiveCheckInTime, checkoutAt(b))}</small>
+                </div>
+                <div className="bd-stay-point end">
+                  <small>Trả phòng</small>
+                  <strong>{fmtTime(checkoutAt(b))}</strong>
+                  <span>{fmtDay(checkoutAt(b))}</span>
+                  {b.actualCheckOutAt && (
+                    <em>
+                      <i className="bi bi-check2" aria-hidden="true" /> Đã trả{' '}
+                      {fmtTime(b.actualCheckOutAt)}
+                    </em>
+                  )}
+                </div>
               </div>
             </div>
             {(b.originalCheckInTime !== b.effectiveCheckInTime ||
-              b.originalCheckOutTime !== checkoutAt(b)) && (
-              <p className="small text-muted mt-3">
-                Lịch ban đầu: {fmtDateTime(b.originalCheckInTime)} →{' '}
-                {fmtDateTime(b.originalCheckOutTime)}
-              </p>
+              b.originalCheckOutTime !== checkoutAt(b) ||
+              next) && (
+              <div className="bd-meta">
+                {(b.originalCheckInTime !== b.effectiveCheckInTime ||
+                  b.originalCheckOutTime !== checkoutAt(b)) && (
+                  <span>
+                    Lịch cũ {fmtDateTime(b.originalCheckInTime)} →{' '}
+                    {fmtDateTime(b.originalCheckOutTime)}
+                  </span>
+                )}
+                {next && (
+                  <span>
+                    Lượt sau <strong>{next.code}</strong> · {fmtDateTime(next.effectiveCheckInTime)}
+                  </span>
+                )}
+              </div>
             )}
-            {next && (
-              <p className="mt-3">
-                Lượt kế tiếp: <strong>{next.code}</strong> ·{' '}
-                {fmtDateTime(next.effectiveCheckInTime)} · cần chừa {data.rules.cleaningBuffer} phút
-                dọn.
-              </p>
+            {(inHouse || !!b.roomCards?.length) && (
+              <BookingStayPanel
+                b={b}
+                roomClass={room ? className(data, room) : '—'}
+                lockAlias={lock?.alias}
+                editable={inHouse}
+                onIssue={() => setModal('card')}
+                onRevoke={(uid) => {
+                  act.revokeCard(b.code, uid);
+                  toast('Đã thu hồi thẻ phòng.');
+                }}
+                onGuests={() => setModal('guests')}
+              />
             )}
             <div className="booking-detail-actions mt-3">
               {pending && (
@@ -271,9 +314,12 @@ export function BookingDetail({ b }: { b: Folio }) {
           </>
         )}
         {tab === 'Chi phí & thanh toán' && <BookingCosts booking={b} />}
-        <div hidden={tab !== 'Khách lưu trú'}>
-          <BookingGuests key={b.code} booking={b} />
-        </div>
+        {tab === 'Khách lưu trú' && (
+          <BookingGuests
+            booking={b}
+            onEdit={inHouse || pending ? () => setModal('guests') : undefined}
+          />
+        )}
         {tab === 'Lịch sử' && (
           <ol className="booking-history">
             {[...b.events]
@@ -298,6 +344,25 @@ export function BookingDetail({ b }: { b: Folio }) {
           }}
         />
       )}
+      {modal === 'checkin' && <CheckinModal key={b.code} b={b} onClose={closeModal} />}
+      {modal === 'card' && (
+        <IssueCardModal
+          key={b.code}
+          bookingCode={b.code}
+          room={b.room}
+          lockId={lock?.lockId ?? null}
+          lockAlias={lock?.alias}
+          validFrom={new Date().toISOString()}
+          validTo={checkoutAt(b)}
+          confirmLabel="Kích hoạt thẻ"
+          onIssued={(card) => {
+            act.issueCard(b.code, card);
+            return null;
+          }}
+          onClose={closeModal}
+        />
+      )}
+      {modal === 'guests' && <GuestModal key={b.code} b={b} onClose={closeModal} />}
     </section>
   );
 }

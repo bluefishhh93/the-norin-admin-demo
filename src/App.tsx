@@ -5,6 +5,7 @@ import { Sidebar } from './layout/Sidebar';
 import { Topbar } from './layout/Topbar';
 import { BookingProvider } from './booking/context';
 import { NewBookingButton } from './booking/NewBookingButton';
+import { CardCheckoutButton } from './booking/CardCheckoutButton';
 import { branchName } from './lib/format';
 import { isPageAllowed, isSystemScope } from './lib/scope';
 import { pages } from './pages';
@@ -53,13 +54,6 @@ export default function App() {
       ? ['Tài khoản hệ thống', 'Tài khoản hệ thống', 'Quản lý tài khoản dùng cho toàn hệ thống. Nhân sự riêng được quản lý trong từng chi nhánh.']
       : pageInfo[page];
   const Page = pages[page] ?? pages.dashboard;
-  const branchOptions = isSuper
-    ? [{ id: 'all', name: 'Quản lý hệ thống' }, ...data.branches]
-    : data.branches.filter((b) => b.id === data.branchId);
-  const scopeText = systemScope
-    ? 'Quản lý toàn hệ thống. Mở một chi nhánh để quản lý vận hành, kinh doanh và thiết bị tại đó.'
-    : `Đang quản lý ${branchName(data, data.branchId)}. Dữ liệu và thao tác áp dụng cho chi nhánh này.`;
-
   return (
     <BookingProvider key={`${data.role}:${data.branchId}`} onCreated={() => navigate('booking-lookup')}>
       <div className="app-shell">
@@ -75,33 +69,12 @@ export default function App() {
                 <h1>{title}</h1>
                 <p>{subtitle}</p>
               </div>
-              <div className="heading-actions">
-                <div className="select-wrap">
-                  <i className="bi bi-buildings" />
-                  <select
-                    aria-label="Không gian quản lý"
-                    value={data.branchId}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      update((d) => {
-                        d.branchId = v;
-                      });
-                    }}
-                  >
-                    {branchOptions.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <i className="bi bi-chevron-down select-chevron" />
+              {!systemScope && BOOKING_PAGES.has(page) && (
+                <div className="heading-actions">
+                  <CardCheckoutButton />
+                  <NewBookingButton />
                 </div>
-                {!systemScope && BOOKING_PAGES.has(page) && <NewBookingButton />}
-              </div>
-            </div>
-            <div className="scope-note">
-              <i className="bi bi-info-circle" />
-              <span>{scopeText}</span>
+              )}
             </div>
             <div aria-live="polite">
               <Page key={`${data.role}:${data.branchId}`} navigate={navigate} />

@@ -25,10 +25,6 @@ export function Staff() {
   const list = systemScope ? data.staff.filter(u => u.branchId === 'all') : scoped(data, data.staff).filter(u => u.role !== 'superadmin');
   const roles = Object.entries(ROLES).filter(([k]) => systemScope ? k === 'superadmin' || k === 'voucher_staff' : k !== 'superadmin');
   const roleOptions: [string, string][] = roles.map(([k, [n]]) => [k, n]);
-  const branchOptions: [string, string][] = systemScope
-    ? [['all', 'Toàn hệ thống']]
-    : data.branches.filter(b => isAllowedBranch(data, b.id)).map(b => [b.id, b.name]);
-
   const openForm = (u?: StaffUser) =>
     modal.openForm({
       title: u ? `Sửa ${u.name}` : 'Thêm nhân sự',
@@ -63,14 +59,11 @@ export function Staff() {
               defaultValue={u?.role ?? (systemScope ? 'superadmin' : 'reception')}
             />
           </div>
-          <div className="col-sm-6">
-            <Select
-              label="Chi nhánh"
-              name="branchId"
-              options={branchOptions}
-              defaultValue={u?.branchId ?? (systemScope ? 'all' : defaultBranch(data))}
-            />
-          </div>
+          <input
+            type="hidden"
+            name="branchId"
+            value={u?.branchId ?? (systemScope ? 'all' : defaultBranch(data))}
+          />
           {!u && (
             <div className="col-12">
               <Field

@@ -106,16 +106,14 @@ export function RateFields({
 
 export function HolidayFields({
   data,
-  branchOpts,
   branchId: initialBranch,
   season
 }: {
   data: DemoData;
-  branchOpts: [string, string][];
   branchId: string;
   season?: Season;
 }) {
-  const [branchId, setBranchId] = useState(season?.branchId ?? initialBranch);
+  const branchId = season?.branchId ?? initialBranch;
   const [mode, setMode] = useState<Season['mode']>(season?.mode ?? 'percent');
   const [value, setValue] = useState(String(season?.value ?? 20));
   const rooms: Room[] = data.rooms
@@ -137,33 +135,21 @@ export function HolidayFields({
         defaultValue={season?.name ?? ''}
         required
       />
-      <div className="price-inputs">
-        <Select
-          label="Chi nhánh"
-          name="branchId"
-          options={branchOpts}
-          value={branchId}
-          onChange={(e) => {
-            setBranchId(e.target.value);
-            setPicked(data.rooms.filter((r) => r.branchId === e.target.value).map((r) => r.number));
-          }}
-          required
-        />
-        <Select
-          label="Cách tăng giá"
-          name="mode"
-          options={[
-            ['percent', 'Tăng theo %'],
-            ['amount', 'Cộng thêm số tiền']
-          ]}
-          value={mode}
-          onChange={(e) => {
-            const m = e.target.value as Season['mode'];
-            setMode(m);
-            setValue(m === 'percent' ? '20' : '100000');
-          }}
-        />
-      </div>
+      <input type="hidden" name="branchId" value={branchId} />
+      <Select
+        label="Cách tăng giá"
+        name="mode"
+        options={[
+          ['percent', 'Tăng theo %'],
+          ['amount', 'Cộng thêm số tiền']
+        ]}
+        value={mode}
+        onChange={(e) => {
+          const m = e.target.value as Season['mode'];
+          setMode(m);
+          setValue(m === 'percent' ? '20' : '100000');
+        }}
+      />
       <div className="price-inputs">
         <Field label="Từ ngày" name="from" type="date" defaultValue={season?.from} required />
         <Field label="Đến ngày" name="to" type="date" defaultValue={season?.to} required />
