@@ -47,7 +47,6 @@ export const pageInfo: Record<string, [string, string, string]> = {
     'Khóa bán phòng',
     'Thiết lập khoảng thời gian ngừng bán hạng phòng.'
   ],
-  locks: ['TTLock mapping', 'Mapping khóa TTLock', 'Chọn phòng và khóa TTLock từ danh sách mẫu.'],
   'room-music': ['Nhạc tablet', 'Nhạc tablet theo phòng', 'Gán file MP3 cho từng Room ID.'],
   kiosks: ['Thiết bị kiosk', 'Thiết bị kiosk', 'Token, máy POS, kết nối agent và vật tư in/thẻ.'],
   branches: [
@@ -106,7 +105,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { page: 'room-classes', icon: 'bi-door-closed', label: 'Hạng phòng & phòng' },
       { page: 'availability', icon: 'bi-slash-circle', label: 'Khóa bán phòng' },
-      { page: 'locks', icon: 'bi-key', label: 'TTLock mapping' },
       { page: 'room-music', icon: 'bi-music-note-beamed', label: 'Nhạc tablet' },
       { page: 'kiosks', icon: 'bi-display', label: 'Thiết bị kiosk' }
     ]
@@ -138,6 +136,7 @@ const ALIASES: Record<string, string> = {
   rooms: 'bookings',
   housekeeping: 'bookings',
   'room-content': 'room-classes',
+  locks: 'room-classes',
   integrations: 'branches',
   'room-qr': 'branches'
 };

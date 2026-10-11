@@ -1,6 +1,7 @@
 import type { DemoData, Folio, PaymentTiming } from '../types';
 import { folioPaid, folioTotal } from '../lib/folio';
 import { fmtDateTime } from '../lib/format';
+import { migrateGuests } from './guest';
 
 export const recordEvent = (folio: Folio, text: string) => {
   folio.events.unshift({ at: new Date().toISOString(), text });
@@ -27,6 +28,7 @@ export const refundable = (b: Folio) =>
 
 // Older demo snapshots contain future bookings without folios. Preserve existing transactions.
 export function normalizeBookings(d: DemoData) {
+  for (const f of d.folios) f.guests = migrateGuests(f.guests);
   for (const b of d.bookings) {
     let f = d.folios.find((row) => row.code === b.id);
     if (!f && b.startsAt && b.endsAt) {

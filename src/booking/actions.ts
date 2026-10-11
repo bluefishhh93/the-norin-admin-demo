@@ -8,7 +8,7 @@ import { refundable, recordEvent } from './model';
 import { addProducts, cancelProduct, isProduct, validateProducts } from './products';
 import { refreshVoucher } from './voucher';
 import { roomChangePrice } from './room-change';
-import type { ProductSelection } from '../types';
+import type { ProductSelection, RoomCard } from '../types';
 
 export function recordPayment(
   d: DemoData,
@@ -49,7 +49,7 @@ export function useBookingActions() {
       apply(d, f);
     });
   const find = (code: string) => data.folios.find((f) => f.code === code)!;
-  return {
+  const actions = {
     confirm: (code: string) =>
       change(code, (_d, f) => {
         if (f.status === 4) {
@@ -67,7 +67,17 @@ export function useBookingActions() {
         f.guests = guests;
         recordEvent(f, 'Cập nhật hồ sơ khách lưu trú');
       }),
-    checkin: (code: string, start: string, end: string): string | null => {
+    issueCard: (code: string, card: RoomCard) =>
+      change(code, (_d, f) => {
+        f.roomCards = [...(f.roomCards ?? []), card];
+        recordEvent(f, `Phát thẻ phòng · UID ${card.uid} · khóa ${card.lockId ?? '—'}`);
+      }),
+    revokeCard: (code: string, uid: string) =>
+      change(code, (_d, f) => {
+        f.roomCards = (f.roomCards ?? []).filter((c) => c.uid !== uid);
+        recordEvent(f, `Thu hồi thẻ phòng · UID ${uid}`);
+      }),
+    checkinError: (code: string, start: string, end: string): string | null => {
       const f = find(code);
       if (f.status !== 1 || f.detailStatus !== 1)
         return 'Chỉ nhận booking đã xác nhận và chưa nhận phòng.';
@@ -98,8 +108,13 @@ export function useBookingActions() {
         true,
         false
       );
-      if (result !== true) return result;
+      return result === true ? null : result;
+    },
+    checkin: (code: string, start: string, end: string, card?: RoomCard): string | null => {
+      const error = actions.checkinError(code, start, end);
+      if (error) return error;
       change(code, (d, b) => {
+        if (card) b.roomCards = [...(b.roomCards ?? []), card];
         b.effectiveCheckInTime = start;
         b.effectiveCheckOutTime = end;
         b.orderDetailCheckOutTime = end;
@@ -131,7 +146,7 @@ export function useBookingActions() {
         });
         recordEvent(
           b,
-          `Nhận phòng tại quầy · hiệu lực ${fmtDateTime(start)} → ${fmtDateTime(end)} · quyền phòng mô phỏng`
+          `Nhận phòng tại quầy · hiệu lực ${fmtDateTime(start)} → ${fmtDateTime(end)}${card ? ` · thẻ UID ${card.uid}` : ''}`
         );
       });
       return null;
@@ -243,9 +258,11 @@ export function useBookingActions() {
           cam.state = 'DISARMED';
           cam.settledAt = b.actualCheckOutAt;
         }
+        const revoked = b.roomCards?.length ?? 0;
+        b.roomCards = [];
         recordEvent(
           b,
-          `Hoàn tất trả phòng · chờ dọn ${d.rules.cleaningBuffer} phút · thu hồi quyền phòng (demo)`
+          `Hoàn tất trả phòng · chờ dọn ${d.rules.cleaningBuffer} phút · thu hồi ${revoked} thẻ phòng`
         );
       });
       return null;
@@ -333,4 +350,5 @@ export function useBookingActions() {
       return null;
     }
   };
+  return actions;
 }

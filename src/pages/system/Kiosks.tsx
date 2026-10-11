@@ -1,7 +1,7 @@
 import type { Kiosk } from '../../types';
 import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
-import { Field, Select } from '../../components/Form';
+import { Field } from '../../components/Form';
 import { branchName } from '../../lib/format';
 import { defaultBranch, scopedWithAll, isAllowedBranch } from '../../lib/scope';
 import {
@@ -31,10 +31,6 @@ export function Kiosks() {
   const warn = list.filter(
     (k) => !k.agentOnline || k.paper <= 20 || k.cards <= 10 || k.returnBin >= 15
   );
-  const branchOptions: [string, string][] = (
-    data.branches.filter((b) => allowed(b.id))
-  ).map((b) => [b.id, b.name]);
-
   const showToken = (text: string, token: string) =>
     modal.openInfo({
       title: 'Token kiosk mới',
@@ -54,12 +50,7 @@ export function Kiosks() {
       submitLabel: 'Lưu',
       body: (
         <>
-          <Select
-            label="Chi nhánh"
-            name="branchId"
-            options={branchOptions}
-            defaultValue={k?.branchId ?? defaultBranch(data)}
-          />
+          <input type="hidden" name="branchId" value={k?.branchId ?? defaultBranch(data)} />
           <Field
             label="Tên kiosk"
             name="name"

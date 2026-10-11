@@ -24,6 +24,69 @@ const readImage = (file: File) =>
 
 const imageOf = (p?: Product) => p?.productImages?.[0]?.image || p?.image || '';
 
+type StockMode = 'in' | 'out';
+const STOCK_MODES: [StockMode, string][] = [
+  ['in', 'Nhập thêm'],
+  ['out', 'Xuất bớt']
+];
+const nextStock = (current: number, mode: StockMode, qty: number) =>
+  mode === 'in' ? current + qty : current - qty;
+
+function StockFields({ product }: { product: Product }) {
+  const [mode, setMode] = useState<StockMode>('in');
+  const [qty, setQty] = useState('');
+  const n = Math.max(0, Math.floor(Number(qty) || 0));
+  const after = nextStock(product.stock, mode, n);
+  return (
+    <>
+      <div className="stock-summary">
+        <div>
+          <span>Tồn hiện tại</span>
+          <strong>{product.stock}</strong>
+        </div>
+        <i className="bi bi-arrow-right" />
+        <div className={after < 0 ? 'invalid' : ''}>
+          <span>Sau cập nhật</span>
+          <strong>{after}</strong>
+        </div>
+      </div>
+      <div className="reception-tabs stock-modes" role="tablist">
+        {STOCK_MODES.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={mode === id}
+            className={mode === id ? 'active' : ''}
+            onClick={() => setMode(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <input type="hidden" name="mode" value={mode} />
+      <Field
+        label="Số lượng"
+        name="qty"
+        type="number"
+        min={1}
+        max={mode === 'out' ? product.stock : undefined}
+        step={1}
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+        autoFocus
+        required
+      />
+      <Field
+        label="Ghi chú"
+        name="note"
+        maxLength={80}
+        placeholder={mode === 'in' ? 'VD: Nhập hàng NCC' : 'VD: Hư hỏng, hết hạn'}
+      />
+    </>
+  );
+}
+
 export function Products() {
   const { data, update, toast } = useStore();
   const modal = useModal();
@@ -65,14 +128,9 @@ export function Products() {
             defaultValue={product?.price ?? 0}
             required
           />
-          <Field
-            label="Tồn kho"
-            name="stock"
-            type="number"
-            min={0}
-            defaultValue={product?.stock ?? 0}
-            required
-          />
+          {!product && (
+            <Field label="Tồn kho ban đầu" name="stock" type="number" min={0} step={1} defaultValue={0} required />
+          )}
           <label className="form-label d-block">
             Ảnh sản phẩm (JPG, PNG, WebP, tối đa 1MB)
             <input
@@ -107,7 +165,6 @@ export function Products() {
           group: v.group,
           category: v.category,
           price: +v.price,
-          stock: +v.stock,
           image,
           productImages: image ? [{ id: 1, image }] : [],
           productType: v.group === 'Phụ kiện yêu' ? 3 : 2
@@ -119,12 +176,57 @@ export function Products() {
             d.products.push({
               id: `SP-${Date.now()}`,
               branchId: defaultBranch(d),
-              ...fields
+              ...fields,
+              stock: Math.max(0, Math.floor(+v.stock || 0))
             });
         });
         toast('Đã lưu sản phẩm trong bản demo.');
       }
     });
+
+  const canEdit = (p: Product) => !(p.branchId === 'all' && data.role !== 'superadmin');
+
+  const openStock = (product: Product) =>
+    modal.openForm({
+      title: `Cập nhật số lượng · ${product.name}`,
+      submitLabel: 'Cập nhật',
+      body: <StockFields product={product} />,
+      onSubmit: (v) => {
+        const mode = v.mode as StockMode;
+        const qty = Number(v.qty);
+        const current = data.products.find((p) => p.id === product.id)?.stock ?? product.stock;
+        const after = nextStock(current, mode, qty);
+        if (!Number.isSafeInteger(qty) || qty < 1 || after < 0) {
+          toast(mode === 'out' ? `Chỉ còn ${current} để xuất.` : 'Kiểm tra lại số lượng.');
+          return false;
+        }
+        const diff = after - current;
+        update((d) => {
+          const target = d.products.find((p) => p.id === product.id);
+          if (!target) return;
+          target.stock = after;
+          if (diff)
+            d.stockMoves.unshift({
+              at: new Date().toISOString(),
+              branchId: target.branchId,
+              name: target.name,
+              type: diff > 0 ? 'in' : 'out',
+              qty: Math.abs(diff),
+              note: v.note.trim() || STOCK_MODES.find(([id]) => id === mode)![1]
+            });
+        });
+        toast(`Đã cập nhật ${product.name}: ${current} → ${after}.`);
+      }
+    });
+
+  const remove = (product: Product) => {
+    if (!confirm(`Xóa sản phẩm “${product.name}”?\nSản phẩm sẽ không còn hiển thị trên website và kiosk. Các booking đã gọi món này vẫn giữ nguyên.`))
+      return;
+    update((d) => {
+      d.products = d.products.filter((p) => p.id !== product.id);
+    });
+    toast(`Đã xóa ${product.name}.`);
+  };
 
   return (
     <>
@@ -172,10 +274,21 @@ export function Products() {
                 <small>{p.category}</small>
               </td>
               <td>{money(p.price)}</td>
-              <td>{p.stock}</td>
               <td>
-                {p.branchId === 'all' && data.role !== 'superadmin' ? null : (
-                  <TextLink onClick={() => openForm(p)}>Sửa</TextLink>
+                <strong className={p.stock <= 5 ? 'stock-low' : ''}>{p.stock}</strong>
+                {p.stock <= 5 && <small>{p.stock ? 'Sắp hết' : 'Hết hàng'}</small>}
+              </td>
+              <td>
+                {canEdit(p) && (
+                  <span className="product-actions">
+                    <TextLink icon="bi-box-seam" onClick={() => openStock(p)}>
+                      Số lượng
+                    </TextLink>
+                    <TextLink onClick={() => openForm(p)}>Sửa</TextLink>
+                    <TextLink icon="bi-trash" onClick={() => remove(p)}>
+                      Xóa
+                    </TextLink>
+                  </span>
                 )}
               </td>
             </tr>

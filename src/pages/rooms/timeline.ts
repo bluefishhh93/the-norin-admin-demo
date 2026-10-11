@@ -1,8 +1,14 @@
-import type { Booking, DemoData, Room } from '../../types';
-import { roomBusy } from '../../lib/rooms';
+import type { Booking, DemoData, Room, StayType } from '../../types';
+import { roomBusy, stayWindow } from '../../lib/rooms';
 
 export const SLOT_MS = 30 * 60000;
-export type TimelineView = 'day' | 'week' | 'month';
+export type TimelineView = 'hour' | 'night' | 'day';
+export type StayOnly = Exclude<StayType, 'Theo giờ'>;
+export const VIEW_STAY: Record<TimelineView, StayType> = {
+  hour: 'Theo giờ',
+  night: 'Qua đêm',
+  day: 'Theo ngày'
+};
 export interface Column {
   key: string;
   start: number;
@@ -48,23 +54,23 @@ export const hourlyColumns = (day: string): Column[] => {
   }));
 };
 
-export const calendarColumns = (day: string, view: Exclude<TimelineView, 'day'>): Column[] => {
-  const start = new Date(`${day}T00:00:00`);
-  if (view === 'month') start.setDate(1);
-  else start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const count =
-    view === 'month' ? new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate() : 7;
+export const clockOf = (ms: number) =>
+  new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+export const stayColumns = (d: DemoData, day: string, stay: StayOnly): Column[] => {
+  const first = new Date(`${day.slice(0, 7)}-01T00:00:00`);
+  const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
   return Array.from({ length: count }, (_, i) => {
-    const date = new Date(start);
-    date.setDate(date.getDate() + i);
-    const end = new Date(date);
-    end.setDate(end.getDate() + 1);
+    const date = new Date(first);
+    date.setDate(i + 1);
+    const key = dateKey(date);
+    const [start, end] = stayWindow(d, stay, key);
     return {
-      key: dateKey(date),
-      start: date.getTime(),
+      key,
+      start: start.getTime(),
       end: end.getTime(),
       label: `${date.getDate()}/${date.getMonth() + 1}`,
-      sub: WEEKDAY[date.getDay()]
+      sub: `${WEEKDAY[date.getDay()]} · ${clockOf(start.getTime())} → ${clockOf(end.getTime())}`
     };
   });
 };
@@ -86,7 +92,13 @@ export const blockReason = (
   return block ? `Khóa bán: ${block.reason || 'Hạng phòng ngừng bán trong khoảng này'}` : undefined;
 };
 
-export const buildCells = (d: DemoData, room: Room, cols: Column[], now: number): Cell[] => {
+export const buildCells = (
+  d: DemoData,
+  room: Room,
+  cols: Column[],
+  now: number,
+  pastAt: 'start' | 'end' = 'end'
+): Cell[] => {
   const busy = roomBusy(d, room).sort((a, b) => a.start - b.start);
   const buffer = d.rules.cleaningBuffer * 60000;
   const cells: Cell[] = cols.map((c) => {
@@ -106,6 +118,14 @@ export const buildCells = (d: DemoData, room: Room, cols: Column[], now: number)
         booking: near.booking,
         reason: `Dọn dự kiến ${d.rules.cleaningBuffer} phút sau ${near.booking.id}`
       };
+    const ahead = busy.find((b) => c.end > b.start - buffer && c.start < b.start);
+    if (ahead)
+      return {
+        ...c,
+        kind: 'cleaning',
+        booking: ahead.booking,
+        reason: `Dọn chuẩn bị ${d.rules.cleaningBuffer} phút trước ${ahead.booking.id}`
+      };
     const blocked = blockReason(d, room, c.start, c.end);
     if (blocked) return { ...c, kind: 'blocked', reason: blocked };
     if (
@@ -121,13 +141,16 @@ export const buildCells = (d: DemoData, room: Room, cols: Column[], now: number)
           : `Chờ dọn · dự kiến cần ${d.rules.cleaningBuffer} phút; phải hoàn tất dọn trước khi nhận khách`
       };
     }
-    if (c.end <= now)
+    if ((pastAt === 'start' ? c.start : c.end) <= now)
       return {
         ...c,
         kind: 'past',
-        reason: 'Thời gian đã qua, không thể tạo booking mới tại ô này'
+        reason:
+          c.end > now
+            ? 'Đã qua giờ nhận phòng của khung này, không thể tạo booking mới'
+            : 'Thời gian đã qua, không thể tạo booking mới tại ô này'
       };
-    return { ...c, kind: 'open', reason: 'Trống · mở form để chọn lịch và kiểm tra khả dụng' };
+    return { ...c, kind: 'open', reason: 'Trống · bấm để chọn' };
   });
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];

@@ -3,7 +3,7 @@ import { useStore } from '../../store';
 import { useModal } from '../../components/ModalHost';
 import { Field, Select } from '../../components/Form';
 import { branchName, money } from '../../lib/format';
-import { scopedWithAll, isAllowedBranch } from '../../lib/scope';
+import { defaultBranch, scopedWithAll, isAllowedBranch } from '../../lib/scope';
 import { DataTable, Panel, PrimaryButton, ScopeNote, TextLink, Toolbar } from '../../components/ui';
 
 const WEEKDAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -11,6 +11,21 @@ const CODE_STATUS: Record<string, string> = {
   available: 'Chưa dùng',
   reserved: 'Đang giữ',
   used: 'Đã dùng'
+};
+
+const MAX_CODES = 10000;
+
+const generateCodes = (count: number, taken: Set<string>) => {
+  const codes: string[] = [];
+  const bytes = new Uint8Array(4);
+  while (codes.length < count) {
+    crypto.getRandomValues(bytes);
+    const code = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    if (taken.has(code)) continue;
+    taken.add(code);
+    codes.push(code);
+  }
+  return codes;
 };
 
 const voucherStatus = (v: Voucher) => {
@@ -31,8 +46,16 @@ export function Vouchers() {
     modal.openInfo({
       title: `Mã voucher · ${v.name}`,
       body: (
+        <>
+        <ScopeNote icon={null}>
+          {v.codes.filter((c) => c.status === 'available').length.toLocaleString('en-US')} còn lại ·{' '}
+          {v.codes.filter((c) => c.status === 'reserved').length.toLocaleString('en-US')} đang giữ ·{' '}
+          {v.codes.filter((c) => c.status === 'used').length.toLocaleString('en-US')} đã dùng ·{' '}
+          {v.codes.length.toLocaleString('en-US')} tổng
+          {v.codes.length > 200 ? ' · hiển thị 200 mã đầu' : ''}
+        </ScopeNote>
         <DataTable headers={['MÃ', 'TRẠNG THÁI', 'BOOKING']}>
-          {v.codes.map((c) => (
+          {v.codes.slice(0, 200).map((c) => (
             <tr key={c.code}>
               <td>
                 <strong>{c.code}</strong>
@@ -42,36 +65,51 @@ export function Vouchers() {
             </tr>
           ))}
         </DataTable>
+        </>
       )
     });
 
+  const autoConflict = (exceptId?: string) =>
+    data.vouchers.some((x) => x.id !== exceptId && x.mode === 'AUTO' && x.active);
+
+  const toggleActive = (v: Voucher) => {
+    if (!v.active && v.mode === 'AUTO' && autoConflict(v.id)) {
+      toast('Đã có chương trình tự động đang hoạt động. Tắt chương trình đó trước.');
+      return;
+    }
+    update((d) => {
+      const target = d.vouchers.find((x) => x.id === v.id);
+      if (target) target.active = !target.active;
+    });
+    toast(v.active ? `Đã tạm dừng ${v.name}.` : `Đã bật ${v.name}.`);
+  };
+
+  const remove = (v: Voucher) => {
+    if (
+      !isAllowedBranch(data, v.branchId) ||
+      !confirm(
+        `Xóa chương trình “${v.name}”?\nChương trình sẽ ngừng nhận lượt áp dụng mới. Lịch sử sử dụng ở các booking vẫn được giữ.`
+      )
+    )
+      return;
+    update((d) => {
+      d.vouchers = d.vouchers.filter((x) => x.id !== v.id);
+    });
+    toast(`Đã xóa chương trình ${v.name}.`);
+  };
+
   const openForm = (voucher?: Voucher) => {
-    const branchOpts: [string, string][] = data.branches
-      .filter(b => isAllowedBranch(data, b.id))
-      .map(b => [b.id, b.name]);
     const selectedDays = voucher?.weekdays ?? [1, 2, 3, 4, 5, 6, 7];
     modal.openForm({
       title: voucher ? 'Sửa voucher' : 'Tạo voucher',
       body: (
         <>
-          <Select
-            label="Phạm vi chi nhánh"
-            name="branchId"
-            options={branchOpts}
-            defaultValue={voucher?.branchId ?? branchOpts[0][0]}
-          />
+          <input type="hidden" name="branchId" value={voucher?.branchId ?? defaultBranch(data)} />
           <Field
             label="Tên chương trình"
             name="name"
             defaultValue={voucher?.name ?? ''}
             maxLength={70}
-            required
-          />
-          <Field
-            label="Mã voucher"
-            name="code"
-            defaultValue={voucher?.code ?? ''}
-            maxLength={24}
             required
           />
           <Select
@@ -129,14 +167,31 @@ export function Vouchers() {
             defaultValue={voucher?.ends ?? '2026-12-31'}
             required
           />
-          <Field
-            label="Số lượt phát hành"
-            name="quota"
-            type="number"
-            min={1}
-            defaultValue={voucher?.quota ?? 100}
-            required
-          />
+          {!voucher && (
+            <Field
+              label="Số lượng voucher"
+              name="quota"
+              type="number"
+              min={1}
+              max={MAX_CODES}
+              step={1}
+              defaultValue={1}
+              required
+            />
+          )}
+          <label className="voucher-active">
+            <span className="form-check form-switch m-0">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                role="switch"
+                name="active"
+                value="1"
+                defaultChecked={voucher?.active ?? true}
+              />
+            </span>
+            Đang hoạt động
+          </label>
           <fieldset className="voucher-weekdays">
             <legend>Thứ áp dụng</legend>
             <div className="d-flex flex-wrap gap-2">
@@ -159,22 +214,25 @@ export function Vouchers() {
         const weekdays = [
           ...form.querySelectorAll<HTMLInputElement>('input[name="weekdays"]:checked')
         ].map((i) => Number(i.value));
-        const code = v.code.trim().toUpperCase();
+        const count = Number(v.quota);
         if (!isAllowedBranch(data, v.branchId)) return false;
         if (
           !weekdays.length ||
           v.ends < v.starts ||
-          +v.quota < (voucher?.used ?? 0) ||
-          (v.type === 'percent' && +v.value > 100) ||
-          data.vouchers.some((x) => x.code === code && x.id !== voucher?.id)
+          (!voucher && (!Number.isInteger(count) || count < 1 || count > MAX_CODES)) ||
+          (v.type === 'percent' && +v.value > 100)
         ) {
-          toast('Kiểm tra ngày, giá trị, số lượt và mã voucher trùng.');
+          toast('Kiểm tra ngày, giá trị và số lượng voucher (1 – 10,000).');
+          return false;
+        }
+        const active = v.active === '1';
+        if (active && v.mode === 'AUTO' && autoConflict(voucher?.id)) {
+          toast('Đã có chương trình tự động đang hoạt động. Tắt chương trình đó trước.');
           return false;
         }
         const fields = {
           branchId: v.branchId,
-          name: v.name,
-          code,
+          name: v.name.trim(),
           type: v.type as Voucher['type'],
           value: +v.value,
           scope: v.scope as Voucher['scope'],
@@ -182,22 +240,27 @@ export function Vouchers() {
           mode: v.mode as Voucher['mode'],
           starts: v.starts,
           ends: v.ends,
-          quota: +v.quota,
-          weekdays
+          weekdays,
+          active
         };
         update((d) => {
           const target = voucher && d.vouchers.find((x) => x.id === voucher.id);
-          if (target) Object.assign(target, fields);
-          else
-            d.vouchers.push({
-              id: `VC-${Date.now()}`,
-              ...fields,
-              used: 0,
-              active: true,
-              codes: [{ code, status: 'available', bookingCode: '' }]
-            });
+          if (target) {
+            Object.assign(target, fields);
+            return;
+          }
+          const taken = new Set(d.vouchers.flatMap((x) => [x.code, ...x.codes.map((c) => c.code)]).map((c) => c.toUpperCase()));
+          const codes = generateCodes(count, taken);
+          d.vouchers.push({
+            id: `VC-${Date.now()}`,
+            ...fields,
+            code: codes[0],
+            quota: count,
+            used: 0,
+            codes: codes.map((code) => ({ code, status: 'available', bookingCode: '' }))
+          });
         });
-        toast('Đã lưu thay đổi trong bản demo.');
+        toast(voucher ? 'Đã lưu thay đổi trong bản demo.' : `Đã tạo ${count.toLocaleString('en-US')} mã voucher.`);
       }
     });
   };
@@ -231,7 +294,7 @@ export function Vouchers() {
               <td>
                 <strong>{v.name}</strong>
                 <small>
-                  {v.code} · {v.mode}
+                  {v.codes.length > 1 ? `${v.codes.length.toLocaleString('en-US')} mã` : v.code} · {v.mode}
                 </small>
               </td>
               <td>{v.branchId === 'all' ? 'Toàn hệ thống' : branchName(data, v.branchId)}</td>
@@ -252,7 +315,25 @@ export function Vouchers() {
               <td>
                 {v.used}/{v.quota}
               </td>
-              <td>{voucherStatus(v)}</td>
+              <td>
+                {v.branchId === 'all' ? (
+                  voucherStatus(v)
+                ) : (
+                  <label className="voucher-active">
+                    <span className="form-check form-switch m-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        checked={v.active}
+                        onChange={() => toggleActive(v)}
+                        aria-label={`${v.active ? 'Tạm dừng' : 'Bật'} ${v.name}`}
+                      />
+                    </span>
+                    {voucherStatus(v)}
+                  </label>
+                )}
+              </td>
               <td>
                 {v.branchId === 'all' ? (
                   'Chỉ xem'
@@ -261,7 +342,10 @@ export function Vouchers() {
                     <TextLink icon="bi-list-ul" onClick={() => showCodes(v)}>
                       Mã
                     </TextLink>{' '}
-                    <TextLink onClick={() => openForm(v)}>Sửa</TextLink>
+                    <TextLink onClick={() => openForm(v)}>Sửa</TextLink>{' '}
+                    <TextLink icon="bi-trash" onClick={() => remove(v)}>
+                      Xóa
+                    </TextLink>
                   </>
                 )}
               </td>

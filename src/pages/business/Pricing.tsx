@@ -33,10 +33,6 @@ export function Pricing() {
   );
   const seasons = scoped(data, activeSeasons(data)).sort((a, b) => a.from.localeCompare(b.from));
   const today = dayKeyOf(new Date());
-  const branchOpts = (
-    data.branches.filter((b) => isAllowedBranch(data, b.id))
-  ).map((b) => [b.id, b.name] as [string, string]);
-
   const editRate = (room: Room) => {
     const rate = roomRate(data, room);
     if (!rate || !isAllowedBranch(data, room.branchId)) return;
@@ -80,7 +76,6 @@ export function Pricing() {
       body: (
         <HolidayFields
           data={data}
-          branchOpts={branchOpts}
           branchId={defaultBranch(data)}
           season={season}
         />
