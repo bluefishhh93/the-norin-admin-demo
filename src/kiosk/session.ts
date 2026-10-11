@@ -2,6 +2,7 @@ import type {
   DemoData,
   Folio,
   Kiosk,
+  KioskFlow,
   KioskSession,
   KioskStep,
   KioskStepKey,
@@ -11,24 +12,60 @@ import type {
 import { scoped } from '../lib/scope';
 import { recordEvent } from '../booking/model';
 
-// Mirrors kiosk-agent: scan (agent.scan.*), VNPay SmartPOS, K750 write + TTLock add
-// (agent.card.issue, held at reader), then agent.card.release.
-export const STEPS: { key: KioskStepKey; label: string }[] = [
-  { key: 'lookup', label: 'Tra cứu & kiểm tra lịch' },
-  { key: 'guests', label: 'Hồ sơ khách' },
-  { key: 'payment', label: 'Thanh toán' },
-  { key: 'card', label: 'Kích hoạt thẻ' },
-  { key: 'release', label: 'Nhả thẻ & hoàn tất' }
-];
+export const FLOW_LABEL: Record<KioskFlow, string> = {
+  booking: 'Đặt phòng',
+  checkin: 'Nhận phòng',
+  checkout: 'Trả phòng'
+};
+
+export const FLOW_STEPS: Record<KioskFlow, { key: KioskStepKey; label: string }[]> = {
+  booking: [
+    { key: 'lookup', label: 'Chọn phòng & thời gian' },
+    { key: 'guests', label: 'Thông tin đặt phòng' },
+    { key: 'payment', label: 'Thanh toán đặt phòng' }
+  ],
+  checkin: [
+    { key: 'lookup', label: 'Tra cứu booking' },
+    { key: 'schedule', label: 'Kiểm tra giờ nhận phòng' },
+    { key: 'guests', label: 'Quét CCCD & xác nhận hồ sơ' },
+    { key: 'face', label: 'Chụp khuôn mặt' },
+    { key: 'policy', label: 'Đồng ý chính sách' },
+    { key: 'card', label: 'Kích hoạt thẻ' },
+    { key: 'release', label: 'Nhả thẻ & hoàn tất' }
+  ],
+  checkout: [
+    { key: 'lookup', label: 'Đọc thẻ & tra cứu lượt ở' },
+    { key: 'schedule', label: 'Xem chi phí trả phòng' },
+    { key: 'payment', label: 'Thanh toán khoản còn lại' },
+    { key: 'release', label: 'Hoàn tất & thu hồi thẻ' },
+    { key: 'receipt', label: 'In hóa đơn' }
+  ]
+};
+
+export const stepsFor = (s: KioskSession) => {
+  if (s.flow === 'checkin' && s.staffHandling)
+    return FLOW_STEPS.checkin
+      .filter(({ key }) => key !== 'face' && key !== 'policy' && key !== 'release')
+      .map((step) => step.key === 'guests' ? { ...step, label: 'Hồ sơ khách (lễ tân)' }
+        : step.key === 'card' ? { ...step, label: 'Phát thẻ bằng E3 & nhận phòng' } : step);
+  if (s.flow === 'checkout' && s.staffHandling)
+    return FLOW_STEPS.checkout.map((step) => step.key === 'lookup'
+      ? { ...step, label: 'Đọc thẻ bằng E3 & tìm booking' } : step);
+  return FLOW_STEPS[s.flow];
+};
 
 export const newSteps = (
   states: Partial<Record<KioskStepKey, KioskStep>> = {}
 ): Record<KioskStepKey, KioskStep> => ({
   lookup: { state: 'todo' },
+  schedule: { state: 'todo' },
   guests: { state: 'todo' },
+  face: { state: 'todo' },
+  policy: { state: 'todo' },
   payment: { state: 'todo' },
   card: { state: 'todo' },
   release: { state: 'todo' },
+  receipt: { state: 'todo' },
   ...states
 });
 
@@ -70,15 +107,18 @@ export const kioskStatus = (k: Kiosk): KioskStatus =>
           ? 'paused'
           : 'ready';
 
-export const currentStep = (s: KioskSession) =>
-  STEPS.find((step) => s.steps[step.key].state !== 'done') ?? STEPS[STEPS.length - 1];
+export const currentStep = (s: KioskSession) => {
+  const steps = stepsFor(s);
+  return steps.find((step) => s.steps[step.key].state !== 'done') ?? steps[steps.length - 1];
+};
 
 export const hasUnknown = (s: KioskSession) =>
-  s.steps.payment.state === 'unknown' || s.steps.card.state === 'unknown';
+  stepsFor(s).some(({ key }) => s.steps[key].state === 'unknown');
 
-// Paid but card not handed over, or POS/agent result pending: most urgent.
 export const isUrgent = (s: KioskSession) =>
-  hasUnknown(s) || (s.steps.payment.state === 'done' && s.steps.release.state !== 'done');
+  hasUnknown(s) ||
+  (s.flow === 'checkin' && !s.staffHandling && s.steps.card.state === 'done' && s.steps.release.state !== 'done') ||
+  (s.flow === 'checkout' && s.steps.payment.state === 'done' && s.steps.release.state !== 'done');
 
 export const kioskWarnings = (k: Kiosk) => [
   ...(k.cardStock === 'empty' ? ['Hết thẻ'] : k.cardStock === 'low' ? ['Thẻ sắp hết'] : []),
@@ -86,7 +126,20 @@ export const kioskWarnings = (k: Kiosk) => [
   ...k.faults
 ];
 
-export const minutesSince = (at: string) => Math.max(0, Math.floor((Date.now() - Date.parse(at)) / 60000));
+export const minutesSince = (at: string, now = Date.now()) =>
+  Math.max(0, Math.floor((now - Date.parse(at)) / 60000));
+
+export const fmtElapsed = (at: string, now = Date.now()) => {
+  const total = minutesSince(at, now);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h ? `${h} giờ ${String(m).padStart(2, '0')} phút` : `${m} phút`;
+};
+
+export const fmtAgo = (at: string, now = Date.now()) => {
+  const m = minutesSince(at, now);
+  return m < 1 ? 'vừa xong' : m < 60 ? `${m} phút trước` : `${fmtElapsed(at, now)} trước`;
+};
 
 export const sessionFolio = (d: DemoData, s: KioskSession): Folio | undefined =>
   s.bookingCode ? d.folios.find((f) => f.code === s.bookingCode) : undefined;

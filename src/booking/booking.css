@@ -679,20 +679,6 @@
   color: var(--ink);
 }
 
-.ic-manual {
-  margin-top: 14px;
-}
-
-.ic-manual-row {
-  display: flex;
-  gap: 8px;
-}
-
-.ic-manual-row .form-control {
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
-  letter-spacing: 1px;
-}
-
 .cl-facts {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content;
 }

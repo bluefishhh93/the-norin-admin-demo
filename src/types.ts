@@ -350,7 +350,8 @@ export interface BranchInfo {
   hichatUrl: string;
   hichatToken: string;
 }
-export type KioskStepKey = 'lookup' | 'guests' | 'payment' | 'card' | 'release';
+export type KioskFlow = 'booking' | 'checkin' | 'checkout';
+export type KioskStepKey = 'lookup' | 'schedule' | 'guests' | 'face' | 'policy' | 'payment' | 'card' | 'release' | 'receipt';
 // unknown: command sent to POS/agent but no result received yet.
 export type KioskStepState = 'todo' | 'running' | 'done' | 'failed' | 'unknown';
 export interface KioskStep {
@@ -367,6 +368,9 @@ export interface KioskSupport {
   note?: string;
 }
 export interface KioskSession {
+  flow: KioskFlow;
+  staffHandling?: boolean;
+  checkoutCardEjected?: boolean;
   bookingCode: string | null;
   startedAt: string;
   updatedAt: string;

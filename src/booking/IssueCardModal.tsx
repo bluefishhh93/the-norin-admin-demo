@@ -11,7 +11,7 @@ import {
   type ParsedCardUid
 } from './card';
 import { useCardReader } from './useCardReader';
-import { ManualUidInput, ReaderVisual, type ReaderState } from './CardReaderParts';
+import { ReaderVisual, type ReaderState } from './CardReaderParts';
 
 export function IssueCardModal({
   bookingCode,
@@ -21,6 +21,7 @@ export function IssueCardModal({
   validFrom,
   validTo,
   confirmLabel,
+  allowExisting = false,
   onIssued,
   onClose
 }: {
@@ -31,6 +32,7 @@ export function IssueCardModal({
   validFrom: string;
   validTo: string;
   confirmLabel: string;
+  allowExisting?: boolean;
   onIssued: (card: RoomCard) => string | null;
   onClose: () => void;
 }) {
@@ -39,6 +41,7 @@ export function IssueCardModal({
   const [phase, setPhase] = useState<ReaderState>(noLock ? 'error' : 'waiting');
   const [uid, setUid] = useState<ParsedCardUid | null>(null);
   const [error, setError] = useState(noLock ? 'Phòng chưa liên kết khóa TTLock.' : '');
+  const [confirmedExisting, setConfirmedExisting] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -54,26 +57,27 @@ export function IssueCardModal({
       if (!parsed) {
         setError(`Không nhận dạng được mã thẻ "${value}". Đặt lại thẻ lên máy E3.`);
         setPhase('error');
-        return false;
+        return;
       }
-      const conflict = cardConflict(data, bookingCode, parsed.hex);
+      const existing = data.folios.find((f) => f.code === bookingCode)?.roomCards?.some((card) => card.uid === parsed.hex);
+      const conflict = allowExisting && existing ? null : cardConflict(data, bookingCode, parsed.hex);
       if (conflict) {
         setError(conflict);
         setPhase('error');
-        return false;
+        return;
       }
       setUid(parsed);
       setError('');
       setPhase('read');
-      return true;
     },
-    [data, bookingCode]
+    [data, bookingCode, allowExisting]
   );
 
   useCardReader(!noLock && (phase === 'waiting' || phase === 'error'), accept);
 
   const reset = () => {
     setUid(null);
+    setConfirmedExisting(false);
     setError('');
     setPhase('waiting');
   };
@@ -81,7 +85,8 @@ export function IssueCardModal({
   const issue = async () => {
     if (!uid || phase === 'issuing') return;
     setPhase('issuing');
-    const res = await requestIssueCard({ bookingCode, cardUid: uid.hex, lockId });
+    const alreadyIssued = allowExisting && data.folios.find((f) => f.code === bookingCode)?.roomCards?.some((card) => card.uid === uid.hex);
+    const res = alreadyIssued ? { ok: true as const } : await requestIssueCard({ bookingCode, cardUid: uid.hex, lockId });
     if (!alive.current) return;
     if (!res.ok) {
       setError(res.reason);
@@ -100,6 +105,7 @@ export function IssueCardModal({
       setPhase('error');
       return;
     }
+    setConfirmedExisting(Boolean(alreadyIssued));
     setPhase('done');
   };
 
@@ -160,7 +166,7 @@ export function IssueCardModal({
         )}
         {phase === 'done' && uid && (
           <>
-            <strong>Thẻ đã kích hoạt</strong>
+            <strong>{confirmedExisting ? 'Đã xác nhận thẻ' : 'Thẻ đã kích hoạt'}</strong>
             <p>
               UID {formatUid(uid.hex)} mở được phòng {room}
             </p>
@@ -197,10 +203,6 @@ export function IssueCardModal({
           </dd>
         </div>
       </dl>
-
-      {phase !== 'done' && !noLock && (
-        <ManualUidInput id="issueManualUid" disabled={phase === 'issuing'} onSubmit={accept} />
-      )}
     </Modal>
   );
 }

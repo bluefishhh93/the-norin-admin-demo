@@ -1,21 +1,23 @@
-import { useState } from 'react';
-import type { Kiosk, SupportOutcome } from '../types';
+import type { Kiosk } from '../types';
 import { useStore } from '../store';
 import { useBooking } from '../booking/context';
 import { fmtDateTime, money } from '../lib/format';
-import { folioDue, folioPaid } from '../lib/folio';
+import { checkoutAt, folioDue, folioPaid } from '../lib/folio';
+import { useNow } from '../lib/useNow';
 import { Pill } from '../components/ui';
 import { useKioskActions } from './actions';
 import { KioskStepControls } from './KioskStepControls';
 import {
-  OUTCOME_LABEL,
-  STEPS,
+  FLOW_LABEL,
   STEP_STATE,
   SUPPORT_STATUS,
+  fmtAgo,
+  fmtElapsed,
   hasUnknown,
   minutesSince,
   openSupport,
-  sessionFolio
+  sessionFolio,
+  stepsFor
 } from './session';
 
 const STEP_PILL = {
@@ -26,36 +28,64 @@ const STEP_PILL = {
   unknown: 'pending'
 } as const;
 
+function SessionFacts({
+  startedAt,
+  updatedAt,
+  checkIn,
+  checkOut
+}: {
+  startedAt: string;
+  updatedAt: string;
+  checkIn?: string;
+  checkOut?: string;
+}) {
+  const now = useNow(1000);
+  return (
+    <dl className="kiosk-session-facts">
+      <div>
+        <dt>Nhận phòng</dt>
+        <dd>{fmtDateTime(checkIn)}</dd>
+      </div>
+      <div>
+        <dt>Trả phòng</dt>
+        <dd>{fmtDateTime(checkOut)}</dd>
+      </div>
+      <div>
+        <dt>Vào kiosk</dt>
+        <dd>{fmtDateTime(startedAt)}</dd>
+      </div>
+      <div>
+        <dt>Đã sử dụng</dt>
+        <dd>
+          {fmtElapsed(startedAt, now)}
+          <small>Cập nhật {fmtAgo(updatedAt, now)}</small>
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
 export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking: () => void }) {
   const { data, toast } = useStore();
   const { openDetail } = useBooking();
   const act = useKioskActions();
-  const [outcome, setOutcome] = useState<SupportOutcome>('kiosk');
-  const [note, setNote] = useState('');
   const s = k.session;
   if (!s) return <p className="text-muted">Máy đang rảnh, không có phiên nhận phòng.</p>;
   const f = sessionFolio(data, s);
   const support = openSupport(s);
+  const active = stepsFor(s).find((step) => s.steps[step.key].state !== 'done');
   const openBooking = () => {
     if (!f) return;
     onOpenBooking();
     openDetail(f.code);
   };
-  const resolve = () => {
-    const selected = s.handedOver && outcome === 'kiosk' ? 'desk' : outcome;
-    const error = act.resolve(k.id, selected, note);
-    toast(error ?? `Đã đóng hỗ trợ: ${OUTCOME_LABEL[selected]}.`);
-  };
-
   return (
     <div className="kiosk-session">
       <div className="kiosk-session-head">
         <div>
-          <strong>{f ? `${f.code} · Phòng ${f.room}` : 'Chưa tìm thấy booking'}</strong>
-          <small>
-            {f ? `${f.customer} · ` : ''}Bắt đầu {fmtDateTime(s.startedAt)} · cập nhật{' '}
-            {minutesSince(s.updatedAt)} phút trước
-          </small>
+          <span className="kiosk-flow-label">{FLOW_LABEL[s.flow]}{active ? ` · ${active.label}` : ''}</span>
+          <strong>{f ? `${f.code} · Phòng ${f.room}` : s.flow === 'checkout' ? 'Chờ đọc thẻ để tìm booking' : s.flow === 'booking' ? 'Khách đang chọn phòng' : 'Chưa tìm thấy booking'}</strong>
+          {f && <small>{f.customer}</small>}
         </div>
         {f && (
           <small>
@@ -63,7 +93,11 @@ export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking
           </small>
         )}
       </div>
-      {!k.agentOnline && (
+      <SessionFacts startedAt={s.startedAt} updatedAt={s.updatedAt} checkIn={f?.effectiveCheckInTime} checkOut={f && checkoutAt(f)} />
+      {support && (
+        <div className="ci-note warn"><i className="bi bi-exclamation-triangle" /><span>{FLOW_LABEL[s.flow]} · {support.reason}{support.status === 'handling' ? ' · Lễ tân đang xử lý tại đây' : ''}</span></div>
+      )}
+      {!k.agentOnline && !s.staffHandling && (
         <div className="ci-note warn">
           <i className="bi bi-wifi-off" />
           <span>
@@ -75,11 +109,11 @@ export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking
       {s.handedOver && (
         <div className="ci-note">
           <i className="bi bi-arrow-left-right" />
-          <span>Đã chuyển sang quầy · kiosk không nhận thao tác mới cho phiên này.</span>
+          <span>Phiên đã chuyển sang quầy trước đó. Tiến độ và hồ sơ đã lưu được giữ nguyên.</span>
         </div>
       )}
       <ol className="kiosk-steps">
-        {STEPS.map(({ key, label }, i) => {
+        {stepsFor(s).map(({ key, label }, i) => {
           const step = s.steps[key];
           return (
             <li key={key} className={step.state}>
@@ -93,8 +127,19 @@ export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking
           );
         })}
       </ol>
-      <KioskStepControls key={`${s.bookingCode}:${s.startedAt}:${Object.values(s.steps).filter((step) => step.state === 'done').length}`} k={k} />
+      {!s.handedOver && (!support || support.status === 'handling') && (
+        <KioskStepControls key={`${s.startedAt}:${stepsFor(s).filter(({ key }) => s.steps[key].state === 'done').length}`} k={k} />
+      )}
 
+      {s.flow === 'checkout' && s.steps.lookup.state === 'failed' && !s.checkoutCardEjected && (
+        <div className="kiosk-support">
+          <strong>Thẻ chưa được trả về khe</strong>
+          <button className="btn-primary-custom" disabled={!k.agentOnline} onClick={() => {
+            const error = act.ejectCheckoutCard(k.id);
+            toast(error ?? 'Đã gửi lệnh nhả thẻ về khe. Mời khách mang thẻ tới lễ tân.');
+          }}>Nhả thẻ ra khe · mời khách tới lễ tân</button>
+        </div>
+      )}
       {support && (
         <div className="kiosk-support">
           <div>
@@ -109,38 +154,12 @@ export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking
               Tiếp nhận
             </button>
           ) : (
-            <div className="kiosk-resolve">
-              <select
-                className="form-select"
-                value={s.handedOver && outcome === 'kiosk' ? 'desk' : outcome}
-                onChange={(e) => setOutcome(e.target.value as SupportOutcome)}
-              >
-                {(Object.keys(OUTCOME_LABEL) as SupportOutcome[])
-                  .filter((o) => !(o === 'kiosk' && s.handedOver))
-                  .map((o) => (
-                    <option key={o} value={o}>
-                      {OUTCOME_LABEL[o]}
-                    </option>
-                  ))}
-              </select>
-              <input
-                className="form-control"
-                placeholder={outcome === 'no-show' ? 'Lý do (bắt buộc)' : 'Ghi chú'}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-              <button className="btn-primary-custom" disabled={hasUnknown(s)} onClick={resolve}>
-                Đã xong
-              </button>
-            </div>
+            <p className="text-muted small mb-0">Lễ tân đang tiếp tục xử lý các bước ngay trong phiên này. Yêu cầu hỗ trợ tự đóng khi phiên hoàn tất.</p>
           )}
-          {hasUnknown(s) && (
+          {hasUnknown(s) && !s.staffHandling && (
             <small className="text-danger">
-              Còn bước “Chưa rõ”: đối chiếu giao dịch / thẻ trước khi đóng.
+              Còn bước “Chưa rõ”: đối chiếu giao dịch hoặc kết quả thẻ trước khi tiếp tục.
             </small>
-          )}
-          {outcome === 'no-show' && f && folioPaid(f) > 0 && (
-            <small>Booking đã thu {money(folioPaid(f))}: hủy và tạo hoàn tiền trong booking.</small>
           )}
         </div>
       )}
@@ -149,11 +168,6 @@ export function KioskSessionView({ k, onOpenBooking }: { k: Kiosk; onOpenBooking
         {f && (
           <button className="btn btn-light" onClick={openBooking}>
             <i className="bi bi-box-arrow-up-right" /> Mở booking
-          </button>
-        )}
-        {!s.handedOver && (
-          <button className="btn btn-outline-secondary" onClick={() => act.handover(k.id)}>
-            <i className="bi bi-arrow-left-right" /> Chuyển sang quầy
           </button>
         )}
       </div>
