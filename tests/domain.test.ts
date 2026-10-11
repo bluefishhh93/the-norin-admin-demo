@@ -9,6 +9,95 @@ import { migrateClassReferences } from '../src/lib/migrations';
 import { checkRoomInterval, getRoomPrice, roomBusy, roomRate } from '../src/lib/rooms';
 import { blockReason } from '../src/pages/rooms/timeline';
 import { isAllowedBranch, isPageAllowed, scoped, scopedWithAll } from '../src/lib/scope';
+import { loadScenario } from '../src/kiosk/demo';
+import { confirmGuests, confirmPayment, demoGuests, receiveDemoResult, retryStep } from '../src/kiosk/workflow';
+import { sessionFolio } from '../src/kiosk/session';
+
+test('manual kiosk guest recovery advances, preserves payment and checks in only after release', () => {
+  const d = createSeed();
+  d.branchId = 'sontra';
+  const k = d.kiosks.find((row) => row.branchId === 'sontra')!;
+  assert.equal(d.kiosks.length, new Set(d.kiosks.map((row) => row.branchId)).size);
+  assert.equal(loadScenario(d, k, 'scan'), null);
+  const f = sessionFolio(d, k.session!)!;
+  assert.match(confirmGuests(d, k, [], 'Lễ tân')!, /hồ sơ/);
+  assert.equal(k.session!.steps.guests.state, 'failed');
+  assert.equal(confirmGuests(d, k, demoGuests(f.customer), 'Lễ tân'), null);
+  assert.equal(k.session!.steps.payment.state, 'running');
+  assert.match(confirmPayment(d, k, 'cash', '', 'Lễ tân')!, /Đang chờ thanh toán tự động/);
+  assert.equal(receiveDemoResult(d, k, 'done'), null);
+  assert.equal(f.payments.length, 1);
+  assert.equal(receiveDemoResult(d, k, 'done'), null);
+  const uid = f.roomCards![0].uid;
+  assert.equal(f.detailStatus, 1);
+  assert.equal(receiveDemoResult(d, k, 'failed'), null);
+  assert.match(retryStep(d, k, 'release', 'Lễ tân')!, /Khắc phục/);
+  k.faults = [];
+  assert.equal(retryStep(d, k, 'release', 'Lễ tân'), null);
+  assert.equal(receiveDemoResult(d, k, 'done'), null);
+  assert.equal(k.session, null);
+  assert.equal(f.detailStatus, 2);
+  assert.equal(f.payments.length, 1);
+  assert.deepEqual(f.roomCards!.map((c) => c.uid), [uid]);
+  assert.equal(d.cameras.filter((c) => c.bookingCode === f.code).length, 1);
+});
+
+test('demo scenarios are available in every branch and reuse only their own booking', () => {
+  for (const branchId of ['sontra', 'mykhe', 'haichau']) {
+    const d = createSeed();
+    d.branchId = branchId;
+    const k = d.kiosks.find((row) => row.branchId === branchId)!;
+    const originalCodes = d.folios.map((f) => f.code);
+    for (const scenario of ['normal', 'scan', 'payment-success', 'cash', 'payment-failed', 'payment', 'card', 'jam', 'offline', 'empty', 'bin', 'ready'] as const) {
+      assert.equal(loadScenario(d, k, scenario), null, `${branchId}: ${scenario}`);
+      assert.equal(d.folios.filter((f) => f.code === `DEMO-${k.id}`).length, scenario === 'ready' ? 0 : 1);
+      assert.equal(originalCodes.every((code) => d.folios.some((f) => f.code === code)), true);
+    }
+  }
+});
+
+test('automatic payment success advances without staff; cash waits and postpaid skips payment', () => {
+  const d = createSeed();
+  d.branchId = 'sontra';
+  const k = d.kiosks.find((row) => row.branchId === 'sontra')!;
+  assert.equal(loadScenario(d, k, 'payment-success'), null);
+  assert.equal(k.session!.steps.payment.state, 'done');
+  assert.equal(k.session!.steps.card.state, 'running');
+  assert.equal(k.session!.support, null);
+  assert.equal(sessionFolio(d, k.session!)!.payments[0].collector, 'Kiosk');
+  assert.equal(receiveDemoResult(d, k, 'done'), null);
+  assert.equal(sessionFolio(d, k.session!)!.payments.length, 1);
+
+  assert.equal(loadScenario(d, k, 'cash'), null);
+  assert.match(receiveDemoResult(d, k, 'done')!, /tiền mặt/);
+  assert.equal(k.session!.steps.payment.state, 'running');
+  assert.equal(confirmPayment(d, k, 'cash', '', 'Lễ tân'), null);
+  assert.equal(k.session!.steps.card.state, 'running');
+  assert.equal(sessionFolio(d, k.session!)!.payments.length, 1);
+
+  assert.equal(loadScenario(d, k, 'scan'), null);
+  const f = sessionFolio(d, k.session!)!;
+  f.paymentTiming = 'postpaid';
+  assert.equal(confirmGuests(d, k, demoGuests(f.customer), 'Lễ tân'), null);
+  assert.equal(k.session!.steps.payment.state, 'done');
+  assert.equal(k.session!.steps.card.state, 'running');
+  assert.equal(f.payments.length, 0);
+});
+
+test('unknown payment, offline and handover block unsafe kiosk continuation', () => {
+  const d = createSeed();
+  d.branchId = 'sontra';
+  const k = d.kiosks.find((row) => row.branchId === 'sontra')!;
+  assert.equal(loadScenario(d, k, 'payment'), null);
+  assert.match(confirmPayment(d, k, 'cash', '', 'Lễ tân')!, /Đối chiếu/);
+  assert.match(retryStep(d, k, 'payment', 'Lễ tân')!, /chưa rõ/);
+  assert.equal(sessionFolio(d, k.session!)!.payments.length, 0);
+  k.agentOnline = false;
+  assert.match(confirmPayment(d, k, 'cash', '', 'Lễ tân')!, /mất kết nối/);
+  k.agentOnline = true;
+  k.session!.handedOver = true;
+  assert.match(confirmPayment(d, k, 'cash', '', 'Lễ tân')!, /chuyển sang quầy/);
+});
 
 const fixture = () => {
   const data = createSeed();

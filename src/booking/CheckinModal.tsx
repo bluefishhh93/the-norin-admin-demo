@@ -3,7 +3,9 @@ import type { Folio, RoomCard } from '../types';
 import { useStore } from '../store';
 import { Modal } from '../components/Modal';
 import { fmtTime, money } from '../lib/format';
-import { folioDue } from '../lib/folio';
+import { folioDue, folioPaid } from '../lib/folio';
+import { kioskOfBooking } from '../kiosk/session';
+import { formatUid } from './card';
 import { className } from '../lib/rooms';
 import { useBookingActions } from './actions';
 import { checkinSchedule } from './checkin';
@@ -25,6 +27,8 @@ export function CheckinModal({ b, onClose }: { b: Folio; onClose: () => void }) 
   const due = folioDue(b);
   const blocked = act.checkinError(b.code, start, end);
   const shifted = start !== b.effectiveCheckInTime || end !== b.effectiveCheckOutTime;
+  const issued = b.roomCards ?? [];
+  const kiosk = kioskOfBooking(data, b.code);
 
   const done = useRef(false);
   const finish = (card?: RoomCard) => {
@@ -63,14 +67,14 @@ export function CheckinModal({ b, onClose }: { b: Folio; onClose: () => void }) 
           <button className="btn btn-light" onClick={onClose}>
             Đóng
           </button>
-          {!lock && !blocked && (
+          {(!lock || issued.length > 0) && !blocked && (
             <button
               className="btn btn-outline-secondary"
               onClick={() => {
                 if (!finish()) onClose();
               }}
             >
-              Nhận phòng không phát thẻ
+              {issued.length ? 'Nhận phòng với thẻ đã kích hoạt' : 'Nhận phòng không phát thẻ'}
             </button>
           )}
           <button
@@ -78,7 +82,7 @@ export function CheckinModal({ b, onClose }: { b: Folio; onClose: () => void }) 
             disabled={!!blocked || !lock}
             onClick={() => setIssuing(true)}
           >
-            <i className="bi bi-credit-card-2-front" /> Phát thẻ phòng
+            <i className="bi bi-credit-card-2-front" /> {issued.length ? 'Phát thêm thẻ' : 'Phát thẻ phòng'}
           </button>
         </>
       }
@@ -152,6 +156,17 @@ export function CheckinModal({ b, onClose }: { b: Folio; onClose: () => void }) 
         <i className={`bi ${shifted ? 'bi-arrow-left-right' : 'bi-check2-circle'}`} />
         <span>{schedule.message}</span>
       </div>
+      {kiosk?.session?.handedOver && (
+        <div className="ci-note">
+          <i className="bi bi-display" />
+          <span>
+            Chuyển từ {kiosk.name}: {b.guests?.length ?? 0} hồ sơ khách, đã thu {money(folioPaid(b))}
+            {issued.length
+              ? `, thẻ ${issued.map((c) => formatUid(c.uid)).join(', ')} đã kích hoạt. Lấy thẻ trong máy giao khách, hoặc thu hồi thẻ đó trong chi tiết booking rồi phát thẻ mới.`
+              : ', chưa có thẻ.'}
+          </span>
+        </div>
+      )}
       {paymentTiming(b) === 'prepaid' && due > 0 && (
         <div className="ci-note danger">
           <i className="bi bi-cash-coin" />

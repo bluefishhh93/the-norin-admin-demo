@@ -13,6 +13,9 @@ const steps = (hourly: number) => [
 ];
 
 export const seedLocks: Lock[] = [
+  { id: 'LK-06', branchId: 'sontra', room: '201', masterProductId: 3006, lockId: 782201, alias: 'Norin ST 201', gateway: true },
+  { id: 'LK-07', branchId: 'mykhe', room: '201', masterProductId: 4006, lockId: 783201, alias: 'Norin MK 201', gateway: true },
+  { id: 'LK-08', branchId: 'haichau', room: '102', masterProductId: 5002, lockId: 784102, alias: 'Norin HC 102', gateway: true },
   {
     id: 'LK-01',
     branchId: 'sontra',
@@ -42,6 +45,16 @@ export const seedLocks: Lock[] = [
     alias: 'Norin MK 102',
     mac: 'D4:12:AB:20:02:02',
     gateway: false
+  },
+  {
+    id: 'LK-05',
+    branchId: 'mykhe',
+    room: '202',
+    masterProductId: 4007,
+    lockId: 783202,
+    alias: 'Norin MK 202',
+    mac: 'D4:12:AB:20:02:07',
+    gateway: true
   },
   {
     id: 'LK-04',

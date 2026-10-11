@@ -263,10 +263,8 @@ export interface Folio {
   effectiveCheckOutTime: string;
   orderDetailCheckOutTime?: string;
   checkinAdjustmentStatus: string | null;
-  checkinAssistanceRequestedAt: string | null;
   checkoutRequestedAt: string | null;
   actualCheckOutAt: string | null;
-  assistanceResolvedAt?: string;
   overstayHandledAt?: string;
   checkoutHandledAt?: string;
   orderDetails: OrderLine[];
@@ -352,16 +350,47 @@ export interface BranchInfo {
   hichatUrl: string;
   hichatToken: string;
 }
+export type KioskStepKey = 'lookup' | 'guests' | 'payment' | 'card' | 'release';
+// unknown: command sent to POS/agent but no result received yet.
+export type KioskStepState = 'todo' | 'running' | 'done' | 'failed' | 'unknown';
+export interface KioskStep {
+  state: KioskStepState;
+  note?: string;
+}
+export type SupportOutcome = 'kiosk' | 'desk' | 'no-show';
+export interface KioskSupport {
+  reason: string;
+  requestedAt: string;
+  status: 'waiting' | 'handling' | 'done';
+  assignee?: string;
+  outcome?: SupportOutcome;
+  note?: string;
+}
+export interface KioskSession {
+  bookingCode: string | null;
+  startedAt: string;
+  updatedAt: string;
+  steps: Record<KioskStepKey, KioskStep>;
+  paymentMethod?: 'card' | 'cash';
+  handedOver: boolean;
+  support: KioskSupport | null;
+}
 export interface Kiosk {
   id: string;
   branchId: string;
   name: string;
+  location: string;
   token: string;
   terminal: string;
   agentOnline: boolean;
-  paper: number;
-  cards: number;
-  returnBin: number;
+  lastSeenAt: string;
+  paused: boolean;
+  // K750 sensors only report levels, not counts.
+  cardStock: 'ok' | 'low' | 'empty';
+  rejectBinFull: boolean;
+  faults: string[];
+  lastSupply: { at: string; cardsAdded: number; binCleared: boolean } | null;
+  session: KioskSession | null;
 }
 export interface CashEntry {
   id: string;

@@ -18,6 +18,7 @@ import { GuestModal } from './GuestModal';
 import { IssueCardModal } from './IssueCardModal';
 import { BookingStayPanel } from './BookingStayPanel';
 import { STAY_ICON, fmtDay, stayLength } from './stay';
+import { currentStep, kioskOfBooking } from '../kiosk/session';
 
 type DetailTab = 'Tổng quan' | 'Sản phẩm' | 'Chi phí & thanh toán' | 'Khách lưu trú' | 'Lịch sử';
 type DetailModal = 'checkin' | 'card' | 'guests';
@@ -56,6 +57,7 @@ export function BookingDetail({ b }: { b: Folio }) {
     clearInitialCheckin();
   };
   const lock = data.locks.find((l) => l.branchId === b.branchId && l.room === b.room);
+  const kiosk = kioskOfBooking(data, b.code);
   const copy = async () => {
     const text = `${b.code} · ${branchName(data, b.branchId)} · Phòng ${b.room}\n${b.customer}\n${fmtDateTime(b.effectiveCheckInTime)} → ${fmtDateTime(checkoutAt(b))}\nTổng: ${money(folioTotal(b))} · ${paymentTiming(b) === 'prepaid' ? 'Trả trước' : 'Trả sau'}`;
     try {
@@ -117,9 +119,11 @@ export function BookingDetail({ b }: { b: Folio }) {
           )}
         </div>
       </div>
-      {b.checkinAssistanceRequestedAt && !b.assistanceResolvedAt && (
-        <div className="alert alert-warning">
-          Khách yêu cầu hỗ trợ nhận phòng từ kiosk. Kiểm tra lịch và phòng trước khi tiếp nhận.
+      {kiosk?.session && (
+        <div className={`alert ${kiosk.session.handedOver ? 'alert-info' : 'alert-warning'}`}>
+          {kiosk.session.handedOver
+            ? `Chuyển từ ${kiosk.name}: hồ sơ, thanh toán và thẻ đã có được giữ nguyên. Chỉ bổ sung phần còn thiếu rồi nhận phòng.`
+            : `Đang xử lý tại ${kiosk.name} · ${currentStep(kiosk.session).label}. Chuyển sang quầy trong Thiết bị kiosk để nhận phòng tại đây.`}
         </div>
       )}
       {b.checkoutRequestedAt && inHouse && (

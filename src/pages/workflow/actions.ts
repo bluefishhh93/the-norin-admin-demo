@@ -22,12 +22,6 @@ export function useFlowActions() {
         );
       }),
 
-    resolveAssistance: (code: string) =>
-      mutate(code, (_d, b) => {
-        b.assistanceResolvedAt = new Date().toISOString();
-        recordEvent(b, 'Lễ tân đã tiếp nhận yêu cầu hỗ trợ check-in');
-      }),
-
     resolveOverstay: (code: string) =>
       mutate(code, (_d, b) => {
         b.overstayHandledAt = new Date().toISOString();

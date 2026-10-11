@@ -1,4 +1,13 @@
-import type { BranchInfo, CashEntry, Kiosk, Rules, Staff, TimeSetting } from '../types';
+import type {
+  BranchInfo,
+  CashEntry,
+  Kiosk,
+  KioskStep,
+  KioskStepKey,
+  Rules,
+  Staff,
+  TimeSetting
+} from '../types';
 import { seedBranches } from './base';
 
 export const seedTimeSetting = (): TimeSetting => ({
@@ -46,18 +55,96 @@ export const seedBranchInfo = (): Record<string, BranchInfo> =>
 export const randomToken = () =>
   `kt_${crypto.getRandomValues(new Uint32Array(3)).join('').slice(0, 18)}`;
 
-export const seedKiosks = (): Kiosk[] =>
-  seedBranches().map((b, i) => ({
-    id: `K-${i + 1}`,
-    branchId: b.id,
-    name: `Kiosk ${b.short} 01`,
-    token: randomToken(),
-    terminal: `SPOS-${i + 1}`,
-    agentOnline: i !== 1,
-    paper: [80, 15, 60][i],
-    cards: [42, 8, 30][i],
-    returnBin: [5, 18, 2][i]
-  }));
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+
+const steps = (
+  states: Partial<Record<KioskStepKey, KioskStep>>
+): Record<KioskStepKey, KioskStep> => ({
+  lookup: { state: 'todo' },
+  guests: { state: 'todo' },
+  payment: { state: 'todo' },
+  card: { state: 'todo' },
+  release: { state: 'todo' },
+  ...states
+});
+
+const kiosk = (
+  id: string,
+  branchId: string,
+  name: string,
+  location: string,
+  terminal: string,
+  extra: Partial<Kiosk> = {}
+): Kiosk => ({
+  id,
+  branchId,
+  name,
+  location,
+  token: randomToken(),
+  terminal,
+  agentOnline: true,
+  lastSeenAt: ago(0),
+  paused: false,
+  cardStock: 'ok',
+  rejectBinFull: false,
+  faults: [],
+  lastSupply: null,
+  session: null,
+  ...extra
+});
+
+// Booking codes match seedFolios: NR-24084 (Sơn Trà 201), NR-24082 (Mỹ Khê 202), NR-24083 (Hải Châu 104).
+export const seedKiosks = (): Kiosk[] => [
+  kiosk('K-1', 'sontra', 'Kiosk Sơn Trà 01', 'Sảnh tầng 1', 'SPOS-1', {
+    session: {
+      bookingCode: 'NR-24084',
+      paymentMethod: 'cash',
+      startedAt: ago(6),
+      updatedAt: ago(4),
+      handedOver: false,
+      support: null,
+      steps: steps({
+        lookup: { state: 'done' },
+        guests: { state: 'done', note: '2/2 khách hợp lệ' },
+        payment: { state: 'running', note: 'Khách chọn tiền mặt · chờ lễ tân thu' }
+      })
+    }
+  }),
+  kiosk('K-3', 'mykhe', 'Kiosk Mỹ Khê 01', 'Sảnh chính', 'SPOS-3', {
+    faults: ['Bộ phát thẻ K750: kẹt thẻ ở khe ra'],
+    session: {
+      bookingCode: 'NR-24082',
+      startedAt: ago(9),
+      updatedAt: ago(3),
+      handedOver: false,
+      steps: steps({
+        lookup: { state: 'done' },
+        guests: { state: 'done', note: '1/1 khách hợp lệ' },
+        payment: { state: 'done', note: 'VNPay SmartPOS · GD SP-240811' },
+        card: { state: 'done', note: 'UID 04A1B2C3 · TTLock đã nhận thẻ' },
+        release: { state: 'failed', note: 'K750 báo kẹt thẻ khi nhả (0x0020)' }
+      }),
+      support: { reason: 'Đã thu tiền, lỗi nhả thẻ', requestedAt: ago(3), status: 'waiting' }
+    }
+  }),
+  kiosk('K-4', 'haichau', 'Kiosk Hải Châu 01', 'Sảnh tầng 1', 'SPOS-4', {
+    agentOnline: false,
+    lastSeenAt: ago(7),
+    rejectBinFull: true,
+    session: {
+      bookingCode: 'NR-24083',
+      startedAt: ago(12),
+      updatedAt: ago(7),
+      handedOver: false,
+      steps: steps({
+        lookup: { state: 'done' },
+        guests: { state: 'done', note: '2/2 khách hợp lệ' },
+        payment: { state: 'unknown', note: 'Đã gửi lệnh SmartPOS · GD SP-240812 · chưa có kết quả' }
+      }),
+      support: { reason: 'Thanh toán chưa rõ kết quả', requestedAt: ago(5), status: 'waiting' }
+    }
+  })
+];
 
 export const seedCashbook = (): CashEntry[] => [
   {

@@ -57,7 +57,6 @@ export function normalizeBookings(d: DemoData) {
         effectiveCheckInTime: b.startsAt,
         effectiveCheckOutTime: b.endsAt,
         checkinAdjustmentStatus: null,
-        checkinAssistanceRequestedAt: null,
         checkoutRequestedAt: null,
         actualCheckOutAt: b.status === 'checked-out' ? b.endsAt : null,
         orderDetails: [
