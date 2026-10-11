@@ -61,10 +61,14 @@ const steps = (
   states: Partial<Record<KioskStepKey, KioskStep>>
 ): Record<KioskStepKey, KioskStep> => ({
   lookup: { state: 'todo' },
+  schedule: { state: 'todo' },
   guests: { state: 'todo' },
+  face: { state: 'todo' },
+  policy: { state: 'todo' },
   payment: { state: 'todo' },
   card: { state: 'todo' },
   release: { state: 'todo' },
+  receipt: { state: 'todo' },
   ...states
 });
 
@@ -97,6 +101,7 @@ const kiosk = (
 export const seedKiosks = (): Kiosk[] => [
   kiosk('K-1', 'sontra', 'Kiosk Sơn Trà 01', 'Sảnh tầng 1', 'SPOS-1', {
     session: {
+      flow: 'checkin',
       bookingCode: 'NR-24084',
       paymentMethod: 'cash',
       startedAt: ago(6),
@@ -105,22 +110,28 @@ export const seedKiosks = (): Kiosk[] => [
       support: null,
       steps: steps({
         lookup: { state: 'done' },
+        schedule: { state: 'done' },
         guests: { state: 'done', note: '2/2 khách hợp lệ' },
-        payment: { state: 'running', note: 'Khách chọn tiền mặt · chờ lễ tân thu' }
+        face: { state: 'done' },
+        policy: { state: 'done' },
+        card: { state: 'running', note: 'Đang kích hoạt thẻ' }
       })
     }
   }),
   kiosk('K-3', 'mykhe', 'Kiosk Mỹ Khê 01', 'Sảnh chính', 'SPOS-3', {
     faults: ['Bộ phát thẻ K750: kẹt thẻ ở khe ra'],
     session: {
+      flow: 'checkin',
       bookingCode: 'NR-24082',
       startedAt: ago(9),
       updatedAt: ago(3),
       handedOver: false,
       steps: steps({
         lookup: { state: 'done' },
+        schedule: { state: 'done' },
         guests: { state: 'done', note: '1/1 khách hợp lệ' },
-        payment: { state: 'done', note: 'VNPay SmartPOS · GD SP-240811' },
+        face: { state: 'done' },
+        policy: { state: 'done' },
         card: { state: 'done', note: 'UID 04A1B2C3 · TTLock đã nhận thẻ' },
         release: { state: 'failed', note: 'K750 báo kẹt thẻ khi nhả (0x0020)' }
       }),
@@ -132,14 +143,18 @@ export const seedKiosks = (): Kiosk[] => [
     lastSeenAt: ago(7),
     rejectBinFull: true,
     session: {
+      flow: 'checkin',
       bookingCode: 'NR-24083',
       startedAt: ago(12),
       updatedAt: ago(7),
       handedOver: false,
       steps: steps({
         lookup: { state: 'done' },
+        schedule: { state: 'done' },
         guests: { state: 'done', note: '2/2 khách hợp lệ' },
-        payment: { state: 'unknown', note: 'Đã gửi lệnh SmartPOS · GD SP-240812 · chưa có kết quả' }
+        face: { state: 'done' },
+        policy: { state: 'done' },
+        card: { state: 'running', note: 'Chờ kết nối agent để kích hoạt thẻ' }
       }),
       support: { reason: 'Thanh toán chưa rõ kết quả', requestedAt: ago(5), status: 'waiting' }
     }

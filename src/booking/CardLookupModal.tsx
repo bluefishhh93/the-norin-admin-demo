@@ -8,7 +8,7 @@ import { className } from '../lib/rooms';
 import { findCardHolder, formatUid, parseCardUid } from './card';
 import { floorOf } from './guest';
 import { useCardReader } from './useCardReader';
-import { ManualUidInput, ReaderVisual } from './CardReaderParts';
+import { ReaderVisual } from './CardReaderParts';
 import { GuestDocsModal } from './GuestDocsModal';
 import { STAY_ICON, fmtDay } from './stay';
 
@@ -32,7 +32,7 @@ export function CardLookupModal({
       const parsed = parseCardUid(value);
       if (!parsed) {
         setResult({ uid: value, error: 'Không nhận dạng được mã thẻ. Đặt lại thẻ lên máy E3.' });
-        return false;
+        return;
       }
       const folio = findCardHolder(data, parsed.hex);
       if (!folio)
@@ -43,7 +43,6 @@ export function CardLookupModal({
       else if (folio.branchId !== data.branchId)
         setResult({ uid: parsed.hex, error: 'Thẻ thuộc chi nhánh khác.' });
       else setResult({ uid: parsed.hex, folio });
-      return true;
     },
     [data]
   );
@@ -82,26 +81,21 @@ export function CardLookupModal({
       }
     >
       {!b ? (
-        <>
-          <div className={`ic-stage ${result ? 'ic-error' : 'ic-waiting'}`} aria-live="polite">
-            <ReaderVisual state={result ? 'error' : 'waiting'} />
-            {result && 'error' in result ? (
-              <>
-                <strong className="text-danger">Không tìm thấy lượt ở</strong>
-                <p>{result.error}</p>
-                {parseCardUid(result.uid) && (
-                  <p className="bsp-uid">UID {formatUid(result.uid)}</p>
-                )}
-              </>
-            ) : (
-              <>
-                <strong>Đặt thẻ phòng lên máy E3</strong>
-                <p>Hệ thống sẽ tìm booking đang dùng thẻ này.</p>
-              </>
-            )}
-          </div>
-          <ManualUidInput id="lookupManualUid" onSubmit={lookup} />
-        </>
+        <div className={`ic-stage ${result ? 'ic-error' : 'ic-waiting'}`} aria-live="polite">
+          <ReaderVisual state={result ? 'error' : 'waiting'} />
+          {result && 'error' in result ? (
+            <>
+              <strong className="text-danger">Không tìm thấy lượt ở</strong>
+              <p>{result.error}</p>
+              {parseCardUid(result.uid) && <p className="bsp-uid">UID {formatUid(result.uid)}</p>}
+            </>
+          ) : (
+            <>
+              <strong>Đặt thẻ phòng lên máy E3</strong>
+              <p>Hệ thống sẽ tìm booking đang dùng thẻ này.</p>
+            </>
+          )}
+        </div>
       ) : (
         <div className="cl" aria-live="polite">
           <div className="ci-room">

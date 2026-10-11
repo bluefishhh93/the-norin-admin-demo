@@ -11,6 +11,7 @@ import { KioskDetailModal } from '../../kiosk/KioskDetailModal';
 import { useKioskActions } from '../../kiosk/actions';
 import { SCENARIOS, type Scenario } from '../../kiosk/demo';
 import {
+  FLOW_LABEL,
   KIOSK_STATUS,
   STEP_STATE,
   currentStep,
@@ -195,9 +196,10 @@ export function Kiosks() {
                 <td>
                   {s && step ? (
                     <>
-                      <strong>{s.bookingCode ?? 'Chưa tìm thấy booking'}</strong>
+                      <strong>{FLOW_LABEL[s.flow]} · {s.bookingCode ?? 'Chưa tìm thấy booking'}</strong>
                       <small>
                         {step.label} · {STEP_STATE[s.steps[step.key].state]} · {minutesSince(s.startedAt)} phút
+                        {s.support && s.support.status !== 'done' ? ` · Lỗi: ${s.support.reason}` : ''}
                         {s.handedOver ? ' · đã chuyển quầy' : ''}
                       </small>
                     </>

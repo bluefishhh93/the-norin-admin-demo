@@ -11,9 +11,10 @@ import {
 import type { DemoData } from './types';
 import { createSeed } from './seed';
 import { normalizeBookings, syncBookings } from './booking/model';
-import { migrateClassReferences, migrateKiosks } from './lib/migrations';
+import { migrateClassReferences, migrateKiosks, migrateLocks } from './lib/migrations';
 
 const STORAGE_KEY = 'norin_admin_demo_react_v1';
+const LOCKS_MIGRATION_KEY = 'norin_admin_demo_locks_v2';
 
 const load = (): DemoData => {
   const base = createSeed();
@@ -25,6 +26,10 @@ const load = (): DemoData => {
       ) as unknown as DemoData;
       migrateClassReferences(restored);
       migrateKiosks(restored);
+      if (!localStorage.getItem(LOCKS_MIGRATION_KEY)) {
+        migrateLocks(restored);
+        localStorage.setItem(LOCKS_MIGRATION_KEY, '1');
+      }
       normalizeBookings(restored);
       return restored;
     }

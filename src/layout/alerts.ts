@@ -2,7 +2,7 @@ import type { DemoData } from '../types';
 import { fmtDateTime, money } from '../lib/format';
 import { scoped } from '../lib/scope';
 import { checkoutAt, folioDue, isActive, isOverstay } from '../lib/folio';
-import { isUrgent, openSupports } from '../kiosk/session';
+import { FLOW_LABEL, isUrgent, openSupports } from '../kiosk/session';
 
 export type AlertKind = 'booking' | 'ops';
 
@@ -68,7 +68,7 @@ export function buildAlerts(d: DemoData): Alert[] {
       icon: 'bi-person-raised-hand',
       tone: isUrgent(s) ? 'red' : 'amber',
       title: `${k.name} cần hỗ trợ`,
-      detail: `${s.support!.reason}${s.bookingCode ? ` · #${s.bookingCode}` : ''}`,
+      detail: `${FLOW_LABEL[s.flow]} · ${s.support!.reason}${s.bookingCode ? ` · #${s.bookingCode}` : ''}`,
       at: s.support!.requestedAt,
       page: 'kiosks',
       branchId: k.branchId,

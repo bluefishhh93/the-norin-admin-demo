@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { Modal } from '../components/Modal';
-import { fmtDateTime } from '../lib/format';
+import { branchName, fmtDateTime } from '../lib/format';
 import { Pill } from '../components/ui';
 import { KioskSessionView } from './KioskSessionView';
 import { useKioskActions } from './actions';
@@ -16,20 +16,21 @@ export function KioskDetailModal({ id, onClose }: { id: string; onClose: () => v
   if (!k) return null;
   const status = KIOSK_STATUS[kioskStatus(k)];
   const warnings = kioskWarnings(k);
+  const inBranch = data.branchId !== 'all';
 
   return (
     <Modal
       open
       size="lg"
-      eyebrow={k.location}
+      eyebrow={inBranch ? 'KIOSK' : branchName(data, k.branchId)}
       title={
         <>
-          {k.name} <Pill status={status.pill} label={status.label} />
+          {inBranch ? 'Phiên hiện tại' : k.name} <Pill status={status.pill} label={status.label} />
         </>
       }
       onClose={onClose}
     >
-      <h3 className="workflow-heading">Phiên hiện tại</h3>
+      {!inBranch && <h3 className="workflow-heading">Phiên hiện tại</h3>}
       <KioskSessionView k={k} onOpenBooking={onClose} />
 
       <h3 className="workflow-heading mt-4">Thiết bị & vật tư</h3>

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 const KEY_GAP = 60;
 
-export function useCardReader(enabled: boolean, onRead: (value: string) => void) {
+export function useCardReader(enabled: boolean, onRead: (value: string) => void, ignoreNestedModal = false) {
   const buffer = useRef('');
   const last = useRef(0);
   const cb = useRef(onRead);
@@ -15,8 +15,7 @@ export function useCardReader(enabled: boolean, onRead: (value: string) => void)
     if (!enabled) return;
     buffer.current = '';
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.dataset.manualUid !== undefined) return;
+      if (ignoreNestedModal && document.querySelectorAll('.modal.show').length > 1) return;
       const now = performance.now();
       if (now - last.current > KEY_GAP) buffer.current = '';
       last.current = now;
@@ -33,5 +32,5 @@ export function useCardReader(enabled: boolean, onRead: (value: string) => void)
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [enabled]);
+  }, [enabled, ignoreNestedModal]);
 }
