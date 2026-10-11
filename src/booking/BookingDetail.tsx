@@ -123,7 +123,7 @@ export function BookingDetail({ b }: { b: Folio }) {
         <div className={`alert ${kiosk.session.handedOver ? 'alert-info' : 'alert-warning'}`}>
           {kiosk.session.handedOver
             ? `Chuyển từ ${kiosk.name}: hồ sơ, thanh toán và thẻ đã có được giữ nguyên. Chỉ bổ sung phần còn thiếu rồi nhận phòng.`
-            : `Đang xử lý tại ${kiosk.name} · ${currentStep(kiosk.session).label}. Chuyển sang quầy trong Thiết bị kiosk hoặc Hàng việc để nhận phòng tại đây.`}
+            : `Đang xử lý tại ${kiosk.name} · ${currentStep(kiosk.session).label}. Chuyển sang quầy trong Thiết bị kiosk để nhận phòng tại đây.`}
         </div>
       )}
       {b.checkoutRequestedAt && inHouse && (

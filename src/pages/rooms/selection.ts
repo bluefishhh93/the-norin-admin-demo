@@ -1,4 +1,37 @@
-import type { Cell, TimelineView } from './timeline';
+import { SLOT_MS, type Cell, type Column, type TimelineView } from './timeline';
+
+const HOUR_MS = 3600000;
+
+export interface HourRange {
+  roomKey: string;
+  start: number;
+  end: number;
+}
+
+export const slotColumns = (from: number, to: number): Column[] => {
+  const cols: Column[] = [];
+  for (let t = from; t < to; t += SLOT_MS)
+    cols.push({ key: String(t), start: t, end: t + SLOT_MS, label: '', sub: '' });
+  return cols;
+};
+
+export const nextHourRange = (
+  current: HourRange | null,
+  roomKey: string,
+  at: number,
+  check: (from: number, to: number) => string | undefined,
+  maxHours: number
+): HourRange | string => {
+  const fresh = !current || current.roomKey !== roomKey || at < current.start;
+  const start = fresh ? at : current.start;
+  const hours = fresh
+    ? 2
+    : Math.min(maxHours, Math.max(2, Math.ceil((at + SLOT_MS - start) / HOUR_MS)));
+  const end = start + hours * HOUR_MS;
+  const blocked = check(start, end);
+  if (blocked) return fresh ? `Không đủ 2 tiếng trống liên tục từ ô này. ${blocked}` : blocked;
+  return { roomKey, start, end };
+};
 
 export interface Selection {
   roomKey: string;

@@ -54,7 +54,7 @@ export function buildAlerts(d: DemoData): Alert[] {
       title: r.context === 'CHECKOUT' ? 'Kiosk yêu cầu thu tiền trả phòng' : 'Kiosk yêu cầu thu tiền đặt phòng',
       detail: `#${r.code}${f ? ` · Phòng ${f.room} · ${money(folioDue(f))}` : ''} · ${r.kiosk}`,
       at: r.requestedAt,
-      page: 'cashier',
+      page: 'booking-lookup',
       branchId: r.branchId,
       code: r.code
     });
@@ -70,7 +70,7 @@ export function buildAlerts(d: DemoData): Alert[] {
       title: `${k.name} cần hỗ trợ`,
       detail: `${s.support!.reason}${s.bookingCode ? ` · #${s.bookingCode}` : ''}`,
       at: s.support!.requestedAt,
-      page: 'work-queue',
+      page: 'kiosks',
       branchId: k.branchId,
       code: s.bookingCode ?? undefined
     });
@@ -101,7 +101,7 @@ export function buildAlerts(d: DemoData): Alert[] {
         title: `Chờ duyệt điều chỉnh giờ · Phòng ${b.room}`,
         detail: `#${b.code} · ${fmtDateTime(b.originalCheckInTime)} → ${fmtDateTime(b.effectiveCheckInTime)}`,
         at: b.effectiveCheckInTime,
-        page: 'work-queue',
+        page: 'booking-lookup',
         branchId: b.branchId,
         code: b.code
       });
@@ -114,7 +114,7 @@ export function buildAlerts(d: DemoData): Alert[] {
         title: `Yêu cầu trả phòng · Phòng ${b.room}`,
         detail: `#${b.code} · ${folioDue(b) ? `còn nợ ${money(folioDue(b))}` : 'đã trả đủ'}`,
         at: b.checkoutRequestedAt,
-        page: 'work-queue',
+        page: 'booking-lookup',
         branchId: b.branchId,
         code: b.code
       });
@@ -127,7 +127,7 @@ export function buildAlerts(d: DemoData): Alert[] {
         title: `Quá giờ · Phòng ${b.room}`,
         detail: `#${b.code} · quá ${Math.floor((now - Date.parse(checkoutAt(b))) / 60000)} phút, camera còn khách`,
         at: checkoutAt(b),
-        page: 'work-queue',
+        page: 'booking-lookup',
         branchId: b.branchId,
         code: b.code
       });

@@ -237,6 +237,73 @@ button.room-board-number {
   min-height: 38px;
 }
 
+.booking-timeline-month {
+  position: relative;
+}
+
+.booking-timeline-month input {
+  color: transparent;
+  cursor: pointer;
+}
+
+.booking-timeline-month input::-webkit-datetime-edit,
+.booking-timeline-month input::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+
+.booking-timeline-month-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2430;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.booking-timeline-month-value i {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.booking-timeline-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.booking-timeline-today:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.booking-timeline-today:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.booking-timeline-today:disabled {
+  border-color: var(--border);
+  background: #f7f8fa;
+  color: #9aa1ab;
+  cursor: default;
+}
+
 .booking-timeline-legend {
   display: flex;
   gap: 8px;
@@ -705,12 +772,63 @@ button.room-board-number {
   font-size: 10px;
 }
 
+.booking-timeline-cell.booked .booking-timeline-cell-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.booking-timeline-cell-top strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.booking-timeline-cell-top em {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.booking-timeline-cell-top em.stay-hour {
+  background: #e7f0fb;
+  color: #1f5fa8;
+}
+
+.booking-timeline-cell-top em.stay-night {
+  background: #ece8f8;
+  color: #4b3a8f;
+}
+
+.booking-timeline-cell-top em.stay-day {
+  background: #fdf1dc;
+  color: #94600f;
+}
+
+.booking-timeline-cell.booked .booking-timeline-cell-time {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.booking-timeline-cell-time i:not(:first-child) {
+  margin-left: 5px;
+}
+
 .booking-timeline-cell.cleaning,
 .booking-timeline-cell.blocked {
   text-align: center;
   font-size: 10px;
 }
-
 .booking-timeline-now {
   position: absolute;
   top: 54px;

@@ -6,12 +6,6 @@ export const pageInfo: Record<string, [string, string, string]> = {
     'Tổng quan hoạt động',
     'Theo dõi toàn bộ hoạt động kinh doanh trong một góc nhìn.'
   ],
-  'work-queue': ['Cần xử lý', 'Việc cần xử lý', 'Các tín hiệu từ kiosk, tablet và camera.'],
-  cashier: [
-    'Thu ngân',
-    'Thu ngân & tiền mặt',
-    'Theo dõi yêu cầu thu tại kiosk và đối soát cuối ca.'
-  ],
   'booking-lookup': [
     'Booking',
     'Quản lý booking',
@@ -82,8 +76,6 @@ export const navGroups: NavGroup[] = [
   {
     items: [
       { page: 'dashboard', icon: 'bi-grid-1x2', label: 'Tổng quan' },
-      { page: 'work-queue', icon: 'bi-inboxes', label: 'Cần xử lý' },
-      { page: 'cashier', icon: 'bi-cash-stack', label: 'Thu ngân & tiền mặt' },
       { page: 'booking-lookup', icon: 'bi-calendar-check', label: 'Booking' },
       { page: 'stay-orders', icon: 'bi-bag-check', label: 'Đơn sản phẩm' },
       { page: 'bookings', icon: 'bi-calendar3', label: 'Bảng phòng', count: true },
@@ -133,6 +125,8 @@ export const systemNavGroups: NavGroup[] = [
 
 const ALIASES: Record<string, string> = {
   calendar: 'booking-lookup',
+  'work-queue': 'booking-lookup',
+  cashier: 'booking-lookup',
   rooms: 'bookings',
   housekeeping: 'bookings',
   'room-content': 'room-classes',

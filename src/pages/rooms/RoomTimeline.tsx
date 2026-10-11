@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Room } from '../../types';
+import type { Room, StayType } from '../../types';
 import { useStore } from '../../store';
 import { useBooking } from '../../booking/context';
 import { fmtDateTime, moneyComma } from '../../lib/format';
@@ -15,17 +15,36 @@ import {
   VIEW_STAY,
   type TimelineView
 } from './timeline';
-import { blockedIn, nextSelection, type Selection } from './selection';
+import {
+  blockedIn,
+  nextHourRange,
+  nextSelection,
+  slotColumns,
+  type HourRange,
+  type Selection
+} from './selection';
 import './booking-rooms.css';
 
 const VIEW_LABELS: Record<TimelineView, string> = { hour: 'Giờ', night: 'Đêm', day: 'Ngày' };
 const dateTime = (ms: number) => fmtDateTime(new Date(ms).toISOString());
+const STAY_META: Record<StayType, { key: string; label: string; icon: string }> = {
+  'Theo giờ': { key: 'hour', label: 'Giờ', icon: 'bi-clock' },
+  'Qua đêm': { key: 'night', label: 'Qua đêm', icon: 'bi-moon-stars' },
+  'Theo ngày': { key: 'day', label: 'Theo ngày', icon: 'bi-sun' }
+};
+const stamp = (ms: number, ref: number) => {
+  const d = new Date(ms);
+  return dateKey(d) === dateKey(new Date(ref))
+    ? clockOf(ms)
+    : `${clockOf(ms)} ${d.getDate()}/${d.getMonth() + 1}`;
+};
 export function RoomTimeline({ rooms }: { rooms: Room[] }) {
   const { data, toast } = useStore();
   const { openBooking, openDetail } = useBooking();
   const [view, setView] = useState<TimelineView>('hour');
   const [day, setDay] = useState(() => dateKey(new Date()));
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [stay, setStay] = useState<Selection | null>(null);
+  const [hourSel, setHourSel] = useState<HourRange | null>(null);
   const hourly = view === 'hour';
   const branchRooms = scoped(data, rooms);
   const [category, setCategory] = useState('all');
@@ -66,7 +85,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
       new Map(
         visibleRooms.map((room) => [
           roomKey(room),
-          buildCells(data, room, cols, now, hourly ? 'end' : 'start')
+          buildCells(data, room, cols, now, hourly ? 'end' : 'start', hourly)
         ])
       ),
     [visibleRooms, data, cols, now, hourly]
@@ -77,8 +96,11 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    setSelection(null);
+    setStay(null);
   }, [view, day, category]);
+  useEffect(() => {
+    setHourSel(null);
+  }, [view, category]);
   useEffect(() => {
     if (!scroll.current) return;
     const todayIndex = cols.findIndex((c) => c.key === today || c.key.startsWith(`${today}-`));
@@ -98,18 +120,30 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
     setDay(dateKey(date));
   };
 
+  const selection = hourly
+    ? hourSel && {
+        roomKey: hourSel.roomKey,
+        from: cols.findIndex((c) => c.end > hourSel.start),
+        to: cols.filter((c) => c.start < hourSel.end).length - 1
+      }
+    : stay;
+  const visible =
+    !!selection &&
+    selection.from >= 0 &&
+    selection.to >= selection.from &&
+    (!hourSel || (hourSel.start < cols[cols.length - 1].end && hourSel.end > cols[0].start));
   const selectedRoom = selection
     ? visibleRooms.find((room) => roomKey(room) === selection.roomKey)
     : undefined;
-  const range = selection && {
-    start: cols[selection.from].start,
-    end: cols[selection.to].end
-  };
+  const range = hourly
+    ? hourSel && { start: hourSel.start, end: hourSel.end }
+    : stay && { start: cols[stay.from].start, end: cols[stay.to].end };
   const hours = range ? (range.end - range.start) / 3600000 : 0;
-  const units = selection ? (hourly ? hours : selection.to - selection.from + 1) : 0;
+  const units = hourly ? hours : stay ? stay.to - stay.from + 1 : 0;
   const unitLabel = hourly ? 'giờ' : view === 'night' ? 'đêm' : 'ngày';
-  const minSlots = 4;
-  const maxSlots = data.rules.maxHourlyStay * 2;
+  const maxHours = data.rules.maxHourlyStay;
+  const hourCheck = (room: Room) => (from: number, to: number) =>
+    blockedIn(buildCells(data, room, slotColumns(from, to), now), 0, (to - from) / 1800000 - 1);
   const price =
     selectedRoom && range
       ? getRoomPrice(
@@ -121,34 +155,34 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           new Date(range.end)
         )
       : null;
-  const canShrink = !!selection && (hourly ? units > 2 : view === 'day' && units > 1);
-  const canGrow =
-    !!selection && (hourly ? units < data.rules.maxHourlyStay : view === 'day');
+  const canShrink = !!range && (hourly ? units > 2 : view === 'day' && units > 1);
+  const canGrow = !!range && (hourly ? units < maxHours : view === 'day');
+  const clear = () => (hourly ? setHourSel(null) : setStay(null));
 
   const choose = (room: Room, index: number) => {
     const key = roomKey(room);
-    const result = nextSelection(
-      view,
-      selection,
-      key,
-      index,
-      rowCells.get(key) || [],
-      minSlots,
-      maxSlots
-    );
+    const result = hourly
+      ? nextHourRange(hourSel, key, cols[index].start, hourCheck(room), maxHours)
+      : nextSelection(view, stay, key, index, rowCells.get(key) || [], 1, 1);
     if (typeof result === 'string') toast(result);
-    else setSelection(result);
+    else if ('anchor' in result) setStay(result);
+    else setHourSel(result);
   };
 
   const step = (delta: number) => {
-    if (!selection) return;
-    const to = selection.to + delta * (hourly ? 2 : 1);
-    const blocked = blockedIn(rowCells.get(selection.roomKey) || [], selection.from, to);
-    if (delta > 0 && blocked) {
-      toast(blocked);
+    if (hourly) {
+      if (!hourSel || !selectedRoom) return;
+      const end = hourSel.end + delta * 3600000;
+      const blocked = delta > 0 && hourCheck(selectedRoom)(hourSel.start, end);
+      if (blocked) toast(blocked);
+      else setHourSel({ ...hourSel, end });
       return;
     }
-    setSelection({ ...selection, to });
+    if (!stay) return;
+    const to = stay.to + delta;
+    const blocked = blockedIn(rowCells.get(stay.roomKey) || [], stay.from, to);
+    if (delta > 0 && blocked) toast(blocked);
+    else setStay({ ...stay, to });
   };
 
   const confirm = () => {
@@ -161,7 +195,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
       start: new Date(start),
       end: new Date(hourly ? start + hours * 3600000 : range.end)
     });
-    setSelection(null);
+    clear();
   };
 
   return (
@@ -189,16 +223,23 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           >
             <i className="bi bi-chevron-left" aria-hidden="true" />
           </button>
-          <label>
+          <label className={hourly ? undefined : 'booking-timeline-month'}>
             <span className="visually-hidden">{hourly ? 'Ngày đang xem' : 'Tháng đang xem'}</span>
             <input
               className="form-control"
               type={hourly ? 'date' : 'month'}
               value={hourly ? day : day.slice(0, 7)}
+              onClick={(e) => !hourly && e.currentTarget.showPicker?.()}
               onChange={(e) =>
                 e.target.value && setDay(hourly ? e.target.value : `${e.target.value}-01`)
               }
             />
+            {!hourly && (
+              <span className="booking-timeline-month-value" aria-hidden="true">
+                {day.slice(5, 7)}/{day.slice(0, 4)}
+                <i className="bi bi-calendar3" />
+              </span>
+            )}
           </label>
           <button
             type="button"
@@ -210,13 +251,15 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           </button>
           <button
             type="button"
-            className="btn btn-light"
+            className="booking-timeline-today"
+            disabled={hourly ? day === today : day.slice(0, 7) === today.slice(0, 7)}
             onClick={() => {
               setDay(dateKey(new Date()));
               setNow(Date.now());
             }}
           >
-            Hôm nay
+            <i className="bi bi-calendar-check" aria-hidden="true" />
+            {hourly ? 'Hôm nay' : 'Tháng này'}
           </button>
         </div>
         <label>
@@ -240,19 +283,20 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
           ? `Bấm giờ bắt đầu, hệ thống chọn sẵn 2 tiếng. Bấm ô xa hơn hoặc dùng nút +/− để đổi số giờ (tối đa ${data.rules.maxHourlyStay} tiếng), rồi bấm Xác nhận.`
           : view === 'night'
             ? `Qua đêm cố định ${data.timeSetting.nightCheckIn} → ${data.timeSetting.nightCheckOut} hôm sau, chỉ chọn 1 đêm. Bấm ô trống rồi bấm Xác nhận.`
-            : `Theo ngày nhận ${data.timeSetting.dayCheckIn}, trả ${data.timeSetting.dayCheckOut} hôm sau. Bấm ngày đầu và ngày cuối để chọn nhiều ngày, sau đó bấm Xác nhận.`}{' '}
-        Ô dọn phòng {data.rules.cleaningBuffer} phút ở trước và sau mỗi booking.
+            : `Theo ngày nhận ${data.timeSetting.dayCheckIn}, trả ${data.timeSetting.dayCheckOut} hôm sau. Bấm ngày đầu và ngày cuối để chọn nhiều ngày, sau đó bấm Xác nhận.`}
+        {hourly &&
+          ` Đặt qua 0h: chọn giờ bắt đầu rồi bấm › sang ngày sau để bấm thêm giờ. Ô dọn phòng ${data.rules.cleaningBuffer} phút ở trước và sau mỗi booking.`}
       </p>
       <div className="booking-timeline-legend">
         <span className="confirmed">Đã xác nhận</span>
         <span className="checked-in">Đang ở</span>
         <span className="pending">Chờ xác nhận</span>
-        <span className="cleaning">Dọn phòng</span>
+        {hourly && <span className="cleaning">Dọn phòng</span>}
         <span className="blocked">Khóa bán</span>
         <span className="past">Đã qua</span>
         <span className="selected">Đang chọn</span>
       </div>
-      {selection && selectedRoom && range && (
+      {selectedRoom && range && (
         <div className="booking-timeline-confirm" role="status">
           <span className="booking-timeline-confirm-icon" aria-hidden="true">
             <i className={`bi ${hourly ? 'bi-clock' : view === 'night' ? 'bi-moon-stars' : 'bi-sun'}`} />
@@ -296,11 +340,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
             </div>
           )}
           <div className="booking-timeline-confirm-actions">
-            <button
-              type="button"
-              className="btn btn-light"
-              onClick={() => setSelection(null)}
-            >
+            <button type="button" className="btn btn-light" onClick={clear}>
               Bỏ chọn
             </button>
             <button type="button" className="btn btn-primary-custom" onClick={confirm}>
@@ -331,7 +371,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                 </div>
               ))}
             </div>
-            {hourly && day === today && (
+            {hourly && now >= cols[0].start && now < cols[cols.length - 1].end && (
               <div
                 className="booking-timeline-now"
                 style={{ left: nowPosition }}
@@ -350,7 +390,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                     (r) => r.branchId === room.branchId && r.classId === room.classId
                   ).length
                 : 0;
-              const rowSelected = selection?.roomKey === key;
+              const rowSelected = visible && selection?.roomKey === key;
               return (
                 <div key={key}>
                   {newGroup && (
@@ -372,9 +412,9 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                     {(rowCells.get(key) || []).map((c, i) => {
                       if ((c.kind === 'booked' || c.kind === 'cleaning') && !c.head) return null;
                       const style = c.span ? { gridColumn: `span ${c.span}` } : undefined;
-                      const stay = c.booking && bookingInterval(data, c.booking);
+                      const interval = c.booking && bookingInterval(data, c.booking);
                       const overdue =
-                        c.booking?.status === 'checked-in' && stay && stay[1] < now;
+                        c.booking?.status === 'checked-in' && interval && interval[1] < now;
                       if (rowSelected && selection && i > selection.from && i <= selection.to)
                         return null;
                       if (rowSelected && selection && i === selection.from && range)
@@ -385,10 +425,12 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                             className="booking-timeline-pick"
                             style={{ gridColumn: `span ${selection.to - selection.from + 1}` }}
                             aria-label={`Bỏ chọn ${room.name} · ${dateTime(range.start)} → ${dateTime(range.end)}`}
-                            onClick={() => setSelection(null)}
+                            onClick={clear}
                           >
                             <strong>
+                              {range.start < cols[0].start ? '← ' : ''}
                               {units} {unitLabel}
+                              {range.end > cols[cols.length - 1].end ? ' →' : ''}
                             </strong>
                             <small>
                               {clockOf(range.start)} → {clockOf(range.end)}
@@ -396,7 +438,7 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                             <i className="bi bi-x" aria-hidden="true" />
                           </button>
                         );
-                      const label = `Phòng ${room.number} · ${dateTime(c.start)} · ${c.reason}${stay ? ` · ${dateTime(stay[0])} → ${dateTime(stay[1])}` : ''}${overdue ? ' · Quá giờ trả phòng' : ''}`;
+                      const label = `Phòng ${room.number} · ${dateTime(c.start)} · ${c.reason}${c.booking ? ` · ${c.booking.type}` : ''}${interval ? ` · Check-in ${dateTime(interval[0])} · Check-out ${dateTime(interval[1])}` : ''}${overdue ? ' · Quá giờ trả phòng' : ''}`;
                       return (
                         <button
                           type="button"
@@ -415,12 +457,26 @@ export function RoomTimeline({ rooms }: { rooms: Room[] }) {
                         >
                           {c.kind === 'booked' && c.booking ? (
                             <>
-                              <strong>
-                                {c.continuesBefore ? '← ' : ''}
-                                {c.booking.id}
-                                {c.continuesAfter ? ' →' : ''}
-                              </strong>
+                              <span className="booking-timeline-cell-top">
+                                <strong>
+                                  {c.continuesBefore ? '← ' : ''}
+                                  {c.booking.id}
+                                  {c.continuesAfter ? ' →' : ''}
+                                </strong>
+                                <em className={`stay-${STAY_META[c.booking.type].key}`}>
+                                  <i className={`bi ${STAY_META[c.booking.type].icon}`} aria-hidden="true" />
+                                  {STAY_META[c.booking.type].label}
+                                </em>
+                              </span>
                               <span>{c.booking.customer}</span>
+                              {interval && (
+                                <small className="booking-timeline-cell-time">
+                                  <i className="bi bi-box-arrow-in-right" aria-hidden="true" />
+                                  {stamp(interval[0], c.start)}
+                                  <i className="bi bi-box-arrow-right" aria-hidden="true" />
+                                  {stamp(interval[1], c.start)}
+                                </small>
+                              )}
                               <small>
                                 {bookingState(c.booking)}
                                 {overdue ? ' · Quá giờ' : ''}

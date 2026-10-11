@@ -81,7 +81,7 @@ export function NotificationBell({ onNavigate }: { onNavigate: (page: string) =>
       onNavigate(a.page);
       return;
     }
-    if (a.kind === 'booking' && a.code) {
+    if (a.code && a.page === 'booking-lookup') {
       openDetail(a.code);
       return;
     }
@@ -167,10 +167,10 @@ export function NotificationBell({ onNavigate }: { onNavigate: (page: string) =>
               className="noti-foot"
               onClick={() => {
                 setOpen(false);
-                onNavigate('work-queue');
+                onNavigate('booking-lookup');
               }}
             >
-              Xem việc cần xử lý <i className="bi bi-arrow-right" />
+              Xem danh sách booking <i className="bi bi-arrow-right" />
             </button>
           )}
         </div>
