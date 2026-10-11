@@ -623,3 +623,7 @@ h1 {
   transform: none;
   cursor: not-allowed;
 }
+.voucher-active{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#47505e;margin:10px 0 0;cursor:pointer;white-space:nowrap}
+.data-table .voucher-active{margin:0;font-weight:600}
+.voucher-active .form-check-input{cursor:pointer}
+.voucher-active .form-check-input:checked{background-color:var(--accent);border-color:var(--accent)}
