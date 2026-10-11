@@ -2,8 +2,6 @@ import type { ComponentType } from 'react';
 import { Dashboard } from './Dashboard';
 import { Customers } from './Customers';
 import { Branches } from './branches/Branches';
-import { WorkQueue } from './workflow/WorkQueue';
-import { Cashier } from './workflow/Cashier';
 import { BookingLookup } from '../booking/BookingLookup';
 import { StayOrders } from './workflow/StayOrders';
 import { Bookings } from './rooms/Bookings';
@@ -25,8 +23,6 @@ export interface PageProps {
 
 export const pages: Record<string, ComponentType<PageProps>> = {
   dashboard: Dashboard,
-  'work-queue': WorkQueue,
-  cashier: Cashier,
   'booking-lookup': BookingLookup,
   'stay-orders': StayOrders,
   bookings: Bookings,
