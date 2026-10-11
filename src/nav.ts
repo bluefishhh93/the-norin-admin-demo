@@ -48,7 +48,7 @@ export const pageInfo: Record<string, [string, string, string]> = {
     'Thiết lập khoảng thời gian ngừng bán hạng phòng.'
   ],
   'room-music': ['Nhạc tablet', 'Nhạc tablet theo phòng', 'Gán file MP3 cho từng Room ID.'],
-  kiosks: ['Thiết bị kiosk', 'Thiết bị kiosk', 'Token, máy POS, kết nối agent và vật tư in/thẻ.'],
+  kiosks: ['Thiết bị kiosk', 'Quản lý kiosk', 'Theo dõi phiên nhận phòng và hỗ trợ khách tại từng bước.'],
   branches: [
     'Chi nhánh',
     'Quản lý chi nhánh',

@@ -9,17 +9,88 @@ import { addProducts, cancelProduct, isProduct, validateProducts } from './produ
 import { refreshVoucher } from './voucher';
 import { roomChangePrice } from './room-change';
 import type { ProductSelection, RoomCard } from '../types';
+import { closeSessionAtDesk, kioskOfBooking } from '../kiosk/session';
+
+// `atKiosk`: the kiosk owns the session and collects payment in its own step.
+export function checkinError(
+  d: DemoData,
+  code: string,
+  start: string,
+  end: string,
+  atKiosk = false
+): string | null {
+  const f = d.folios.find((x) => x.code === code)!;
+  if (f.status !== 1 || f.detailStatus !== 1)
+    return 'Chỉ nhận booking đã xác nhận và chưa nhận phòng.';
+  const kiosk = kioskOfBooking(d, code);
+  if (!atKiosk && kiosk && !kiosk.session!.handedOver)
+    return `Booking đang được xử lý tại ${kiosk.name}. Chuyển phiên sang quầy trước.`;
+  if (!atKiosk && f.paymentTiming === 'prepaid' && folioDue(f) > 0)
+    return 'Booking trả trước cần thu đủ trước khi nhận phòng.';
+  if (Date.now() > Date.parse(end))
+    return 'Lịch lưu trú đã hết hạn. Hãy sửa lịch hoặc xác nhận không đến.';
+  const room = d.rooms.find((r) => r.branchId === f.branchId && r.number === f.room);
+  if (!room || room.status === 'cleaning') return 'Phòng chưa dọn xong.';
+  if (
+    d.folios.some(
+      (o) =>
+        o.code !== code &&
+        o.branchId === f.branchId &&
+        o.room === f.room &&
+        o.detailStatus === 2 &&
+        isActive(o)
+    )
+  )
+    return 'Phòng vẫn còn khách, chưa thể nhận booking mới.';
+  const result = checkRoomInterval(d, room, new Date(start), new Date(end), f.stayType, code, true, false);
+  return result === true ? null : result;
+}
+
+export function applyCheckin(d: DemoData, b: Folio, start: string, end: string, place: 'quầy' | 'kiosk') {
+  b.effectiveCheckInTime = start;
+  b.effectiveCheckOutTime = end;
+  b.orderDetailCheckOutTime = end;
+  b.roomRate = {
+    room: b.room,
+    start,
+    end,
+    amount: b.orderDetails
+      .filter((i) => i.productType === 6 && i.fulfillment !== 'cancelled')
+      .reduce((s, i) => s + i.price * i.quantity, 0)
+  };
+  b.detailStatus = 2;
+  b.actualCheckInAt = new Date().toISOString();
+  b.checkinDecision =
+    start === b.originalCheckInTime && end === b.originalCheckOutTime ? 'ON_TIME' : 'DESK_ADJUSTED';
+  d.rooms.find((row) => row.branchId === b.branchId && row.number === b.room)!.status = 'occupied';
+  d.cameras.push({
+    roomKey: `${b.branchId}:${b.room}`,
+    bookingCode: b.code,
+    state: 'WAITING_GUEST',
+    lastOccupancy: 0,
+    scheduledCheckOutAt: end,
+    settledAt: null,
+    notifiedAt: null,
+    cleaningArmedAt: null
+  });
+  const cards = (b.roomCards ?? []).map((c) => c.uid).join(', ');
+  recordEvent(
+    b,
+    `Nhận phòng tại ${place} · hiệu lực ${fmtDateTime(start)} → ${fmtDateTime(end)}${cards ? ` · thẻ UID ${cards}` : ''}`
+  );
+}
 
 export function recordPayment(
   d: DemoData,
   f: Folio,
   amount: number,
   method: PayMethod,
-  reason: string
+  reason: string,
+  collector = 'Nguyễn Anh'
 ) {
   const id = crypto.randomUUID();
   const at = new Date().toISOString();
-  f.payments.push({ id: `PM-${id}`, amount, method, createdAt: at, collector: 'Nguyễn Anh' });
+  f.payments.push({ id: `PM-${id}`, amount, method, createdAt: at, collector });
   d.cashbook.unshift({
     id: `CB-${id}`,
     type: amount < 0 ? 'out' : 'in',
@@ -29,7 +100,7 @@ export function recordPayment(
     amount: Math.abs(amount),
     method,
     note: `${f.code} · ${reason}`,
-    by: 'Nguyễn Anh'
+    by: collector
   });
   recordEvent(f, `${amount < 0 ? 'Hoàn' : 'Thu'} ${money(Math.abs(amount))} · ${reason} (demo)`);
   if (!folioDue(f))
@@ -77,77 +148,15 @@ export function useBookingActions() {
         f.roomCards = (f.roomCards ?? []).filter((c) => c.uid !== uid);
         recordEvent(f, `Thu hồi thẻ phòng · UID ${uid}`);
       }),
-    checkinError: (code: string, start: string, end: string): string | null => {
-      const f = find(code);
-      if (f.status !== 1 || f.detailStatus !== 1)
-        return 'Chỉ nhận booking đã xác nhận và chưa nhận phòng.';
-      if (f.paymentTiming === 'prepaid' && folioDue(f) > 0)
-        return 'Booking trả trước cần thu đủ trước khi nhận phòng.';
-      if (Date.now() > Date.parse(end))
-        return 'Lịch lưu trú đã hết hạn. Hãy sửa lịch hoặc xác nhận không đến.';
-      const room = data.rooms.find((r) => r.branchId === f.branchId && r.number === f.room);
-      if (!room || room.status === 'cleaning') return 'Phòng chưa dọn xong.';
-      if (
-        data.folios.some(
-          (o) =>
-            o.code !== code &&
-            o.branchId === f.branchId &&
-            o.room === f.room &&
-            o.detailStatus === 2 &&
-            isActive(o)
-        )
-      )
-        return 'Phòng vẫn còn khách, chưa thể nhận booking mới.';
-      const result = checkRoomInterval(
-        data,
-        room,
-        new Date(start),
-        new Date(end),
-        f.stayType,
-        code,
-        true,
-        false
-      );
-      return result === true ? null : result;
-    },
+    checkinError: (code: string, start: string, end: string) =>
+      checkinError(data, code, start, end),
     checkin: (code: string, start: string, end: string, card?: RoomCard): string | null => {
-      const error = actions.checkinError(code, start, end);
+      const error = checkinError(data, code, start, end);
       if (error) return error;
       change(code, (d, b) => {
         if (card) b.roomCards = [...(b.roomCards ?? []), card];
-        b.effectiveCheckInTime = start;
-        b.effectiveCheckOutTime = end;
-        b.orderDetailCheckOutTime = end;
-        b.roomRate = {
-          room: b.room,
-          start,
-          end,
-          amount: b.orderDetails
-            .filter((i) => i.productType === 6 && i.fulfillment !== 'cancelled')
-            .reduce((s, i) => s + i.price * i.quantity, 0)
-        };
-        b.detailStatus = 2;
-        b.actualCheckInAt = new Date().toISOString();
-        b.checkinDecision =
-          start === b.originalCheckInTime && end === b.originalCheckOutTime
-            ? 'ON_TIME'
-            : 'DESK_ADJUSTED';
-        const r = d.rooms.find((row) => row.branchId === b.branchId && row.number === b.room)!;
-        r.status = 'occupied';
-        d.cameras.push({
-          roomKey: `${b.branchId}:${b.room}`,
-          bookingCode: code,
-          state: 'WAITING_GUEST',
-          lastOccupancy: 0,
-          scheduledCheckOutAt: end,
-          settledAt: null,
-          notifiedAt: null,
-          cleaningArmedAt: null
-        });
-        recordEvent(
-          b,
-          `Nhận phòng tại quầy · hiệu lực ${fmtDateTime(start)} → ${fmtDateTime(end)}${card ? ` · thẻ UID ${card.uid}` : ''}`
-        );
+        applyCheckin(d, b, start, end, 'quầy');
+        closeSessionAtDesk(d, code);
       });
       return null;
     },

@@ -2,6 +2,7 @@ import type { DemoData } from '../types';
 import { fmtDateTime, money } from '../lib/format';
 import { scoped } from '../lib/scope';
 import { checkoutAt, folioDue, isActive, isOverstay } from '../lib/folio';
+import { isUrgent, openSupports } from '../kiosk/session';
 
 export type AlertKind = 'booking' | 'ops';
 
@@ -59,6 +60,22 @@ export function buildAlerts(d: DemoData): Alert[] {
     });
   }
 
+  for (const k of openSupports(d)) {
+    const s = k.session!;
+    list.push({
+      id: `assist:${k.id}:${s.support!.requestedAt}`,
+      kind: 'ops',
+      icon: 'bi-person-raised-hand',
+      tone: isUrgent(s) ? 'red' : 'amber',
+      title: `${k.name} cần hỗ trợ`,
+      detail: `${s.support!.reason}${s.bookingCode ? ` · #${s.bookingCode}` : ''}`,
+      at: s.support!.requestedAt,
+      page: 'work-queue',
+      branchId: k.branchId,
+      code: s.bookingCode ?? undefined
+    });
+  }
+
   for (const b of active) {
     b.orderDetails.forEach((item, i) => {
       if (item.phase !== 'stay' || item.fulfillment !== 'new') return;
@@ -84,19 +101,6 @@ export function buildAlerts(d: DemoData): Alert[] {
         title: `Chờ duyệt điều chỉnh giờ · Phòng ${b.room}`,
         detail: `#${b.code} · ${fmtDateTime(b.originalCheckInTime)} → ${fmtDateTime(b.effectiveCheckInTime)}`,
         at: b.effectiveCheckInTime,
-        page: 'work-queue',
-        branchId: b.branchId,
-        code: b.code
-      });
-    if (b.checkinAssistanceRequestedAt && !b.assistanceResolvedAt)
-      list.push({
-        id: `assist:${b.code}:${b.checkinAssistanceRequestedAt}`,
-        kind: 'ops',
-        icon: 'bi-person-raised-hand',
-        tone: 'amber',
-        title: `Khách cần hỗ trợ check-in · Phòng ${b.room}`,
-        detail: `#${b.code} · ${b.customer}`,
-        at: b.checkinAssistanceRequestedAt,
         page: 'work-queue',
         branchId: b.branchId,
         code: b.code

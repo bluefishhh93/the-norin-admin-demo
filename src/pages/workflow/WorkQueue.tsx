@@ -1,11 +1,20 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useStore } from '../../store';
 import { branchName, fmtDateTime, fmtTime, money } from '../../lib/format';
 import { scoped } from '../../lib/scope';
-import { checkoutAt, folioDue, isActive, isOverstay, overstayType } from '../../lib/folio';
+import { checkoutAt, folioDue, folioPaid, isActive, isOverstay, overstayType } from '../../lib/folio';
 import { DataTable, Panel, TextLink } from '../../components/ui';
 import { useFlowActions } from './actions';
 import { useFolioDialogs } from '../../booking/payment';
+import { KioskDetailModal } from '../../kiosk/KioskDetailModal';
+import {
+  STEP_STATE,
+  SUPPORT_STATUS,
+  isUrgent,
+  minutesSince,
+  openSupports,
+  sessionFolio
+} from '../../kiosk/session';
 
 interface Item {
   key: string;
@@ -23,6 +32,7 @@ export function WorkQueue() {
   const { detail, collect } = useFolioDialogs();
   const list = scoped(data, data.folios).filter(isActive);
   const requests = scoped(data, data.requests);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const items: Item[] = [
     ...list
@@ -40,21 +50,26 @@ export function WorkQueue() {
           </TextLink>
         )
       })),
-    ...list
-      .filter((b) => b.checkinAssistanceRequestedAt && !b.assistanceResolvedAt)
-      .map((b) => ({
-        key: `assist-${b.code}`,
-        code: b.code,
-        room: b.room,
-        branchId: b.branchId,
-        kind: 'Hỗ trợ check-in',
-        detail: `Khách cần lễ tân hỗ trợ · ${fmtDateTime(b.checkinAssistanceRequestedAt)}`,
+    ...openSupports(data).map((k) => {
+      const s = k.session!;
+      const support = s.support!;
+      const f = sessionFolio(data, s);
+      return {
+        key: `assist-${k.id}`,
+        code: s.bookingCode ?? 'Chưa rõ booking',
+        room: f?.room ?? '—',
+        branchId: k.branchId,
+        kind: `Hỗ trợ kiosk · ${SUPPORT_STATUS[support.status]}${isUrgent(s) ? ' · ưu tiên' : ''}`,
+        detail: `${support.reason} · ${k.name} · chờ ${minutesSince(support.requestedAt)} phút · ${
+          f ? `đã thu ${money(folioPaid(f))}` : 'chưa thu'
+        }, thẻ ${STEP_STATE[s.steps.card.state].toLowerCase()} · ${support.assignee ?? 'chưa ai nhận'}`,
         action: (
-          <TextLink icon="bi-arrow-right" onClick={() => act.resolveAssistance(b.code)}>
-            Đã hỗ trợ
+          <TextLink icon="bi-arrow-right" onClick={() => setViewing(k.id)}>
+            {support.status === 'waiting' ? 'Xem & tiếp nhận' : 'Xem & xử lý'}
           </TextLink>
         )
-      })),
+      };
+    }),
     ...list
       .filter((b) => isOverstay(data, b))
       .map((b) => {
@@ -158,6 +173,7 @@ export function WorkQueue() {
           </tr>
         ))}
       </DataTable>
+      {viewing && <KioskDetailModal id={viewing} onClose={() => setViewing(null)} />}
     </Panel>
   );
 }

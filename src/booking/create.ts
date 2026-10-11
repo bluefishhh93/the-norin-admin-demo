@@ -99,7 +99,6 @@ export const applyBooking = (
     effectiveCheckInTime: booking.startsAt!,
     effectiveCheckOutTime: booking.endsAt!,
     checkinAdjustmentStatus: null,
-    checkinAssistanceRequestedAt: null,
     checkoutRequestedAt: null,
     actualCheckOutAt: null,
     orderDetails: [

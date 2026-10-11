@@ -213,10 +213,6 @@ export function RoomBoard() {
                                   Còn thu: <strong>{money(folioDue(current))}</strong>
                                 </p>
                               )}
-                              {current?.checkinAssistanceRequestedAt &&
-                                !current.assistanceResolvedAt && (
-                                  <p className="room-board-warning">Khách cần hỗ trợ nhận phòng</p>
-                                )}
                               {current?.checkoutRequestedAt && !current.checkoutHandledAt && (
                                 <p className="room-board-warning">Khách yêu cầu trả phòng</p>
                               )}

@@ -11,7 +11,7 @@ import {
 import type { DemoData } from './types';
 import { createSeed } from './seed';
 import { normalizeBookings, syncBookings } from './booking/model';
-import { migrateClassReferences } from './lib/migrations';
+import { migrateClassReferences, migrateKiosks } from './lib/migrations';
 
 const STORAGE_KEY = 'norin_admin_demo_react_v1';
 
@@ -24,6 +24,7 @@ const load = (): DemoData => {
         Object.keys(base).map((k) => [k, saved[k] ?? base[k as keyof DemoData]])
       ) as unknown as DemoData;
       migrateClassReferences(restored);
+      migrateKiosks(restored);
       normalizeBookings(restored);
       return restored;
     }

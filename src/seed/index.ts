@@ -67,8 +67,8 @@ const seedFolios = (bookings: Booking[], rooms: Room[]): Folio[] => {
   const offsets = [
     [-85, 35],
     [40, 160],
-    [90, 210],
-    [180, 300],
+    [-10, 110],
+    [5, 125],
     [-125, -5],
     [-140, -20]
   ];
@@ -92,7 +92,6 @@ const seedFolios = (bookings: Booking[], rooms: Room[]): Folio[] => {
       effectiveCheckInTime: shifted(start),
       effectiveCheckOutTime: shifted(end + (index === 1 ? 30 : 0)),
       checkinAdjustmentStatus: index === 1 ? 'PENDING_REVIEW' : null,
-      checkinAssistanceRequestedAt: index === 2 ? shifted(-12) : null,
       checkoutRequestedAt: index === 0 ? shifted(-8) : null,
       actualCheckOutAt: null,
       orderDetails: [
@@ -136,6 +135,38 @@ const seedFolios = (bookings: Booking[], rooms: Room[]): Folio[] => {
       ]
     };
   });
+  // Kiosk Mỹ Khê 01 session: paid on SmartPOS and card activated, but K750 failed to release it.
+  const kioskPaid = folios[1];
+  kioskPaid.paymentTiming = 'prepaid';
+  kioskPaid.payments.push({
+    id: 'PM-SEED-03',
+    method: 'card',
+    amount: kioskPaid.orderDetails[0].price,
+    createdAt: shifted(-6),
+    collector: 'Kiosk'
+  });
+  kioskPaid.guests = [
+    {
+      fullName: 'Trần Hoàng Phúc',
+      dateOfBirth: '1992-04-18',
+      gender: 'Male',
+      idType: 'id_card',
+      idNumber: '048092001234',
+      nationality: 'Việt Nam',
+      address: 'Ngũ Hành Sơn, Đà Nẵng',
+      issueDate: '2021-06-01',
+      expiryDate: '2037-04-18'
+    }
+  ];
+  kioskPaid.roomCards = [
+    {
+      uid: '04A1B2C3',
+      lockId: 783202,
+      issuedAt: shifted(-4),
+      validFrom: kioskPaid.effectiveCheckInTime,
+      validTo: kioskPaid.effectiveCheckOutTime
+    }
+  ];
   folios[0].orderDetails.push({
     name: 'Nước suối · gọi từ tablet',
     productType: 2,
