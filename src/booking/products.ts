@@ -63,10 +63,10 @@ export function cancelProduct(d: DemoData, f: Folio, index: number) {
   if (!isProduct(item) || item.fulfillment === 'delivered' || item.fulfillment === 'cancelled')
     return;
   item.fulfillment = 'cancelled';
-  if (item.stockReserved && item.productId) {
-    const p = d.products.find((p) => p.id === item.productId)!;
+  const p = item.stockReserved && item.productId ? d.products.find((x) => x.id === item.productId) : undefined;
+  item.stockReserved = false;
+  if (p) {
     p.stock += item.quantity;
-    item.stockReserved = false;
     d.stockMoves.unshift({
       at: new Date().toISOString(),
       branchId: p.branchId,

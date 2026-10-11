@@ -1,14 +1,17 @@
 import { useStore } from '../store';
 import { branchName } from '../lib/format';
+import { NotificationBell } from './NotificationBell';
 
 export function Topbar({
   label,
   onMenu,
-  onRoleChange
+  onRoleChange,
+  onNavigate
 }: {
   label: string;
   onMenu: () => void;
   onRoleChange: () => void;
+  onNavigate: (page: string) => void;
 }) {
   const { data } = useStore();
   const isSuper = data.role === 'superadmin';
@@ -26,6 +29,7 @@ export function Topbar({
         <span className="demo-chip">
           <span className="online-dot" /> Dữ liệu mẫu
         </span>
+        <NotificationBell onNavigate={onNavigate} />
         <span className="topbar-separator" />
         <div className="avatar">{isSuper ? 'NA' : 'LM'}</div>
         <div className="profile-text">

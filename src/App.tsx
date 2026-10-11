@@ -65,7 +65,7 @@ export default function App() {
       <div className="app-shell">
         <Sidebar page={page} open={menuOpen} onNavigate={navigate} />
         <div className="main-wrap">
-          <Topbar label={label} onMenu={() => setMenuOpen((o) => !o)} onRoleChange={switchRole} />
+          <Topbar label={label} onMenu={() => setMenuOpen((o) => !o)} onRoleChange={switchRole} onNavigate={navigate} />
           <main className="content">
             <div className="page-heading">
               <div>

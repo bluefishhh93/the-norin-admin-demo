@@ -627,3 +627,12 @@ h1 {
 .data-table .voucher-active{margin:0;font-weight:600}
 .voucher-active .form-check-input{cursor:pointer}
 .voucher-active .form-check-input:checked{background-color:var(--accent);border-color:var(--accent)}
+.product-actions{display:inline-flex;flex-wrap:wrap;gap:4px 12px}
+.stock-low{color:#c2410c}
+.stock-summary{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:9px;background:var(--canvas);padding:12px 16px;margin-bottom:14px}
+.stock-summary>div{display:flex;flex-direction:column;gap:2px}
+.stock-summary span{font-size:11px;font-weight:700;color:var(--muted)}
+.stock-summary strong{font-size:20px;color:var(--ink);line-height:1.2}
+.stock-summary .invalid strong{color:#dc2626}
+.stock-summary>i{color:var(--muted)}
+.stock-modes{display:inline-flex;margin-bottom:12px}

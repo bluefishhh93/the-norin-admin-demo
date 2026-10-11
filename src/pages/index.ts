@@ -15,7 +15,6 @@ import { Vouchers } from './business/Vouchers';
 import { Products } from './business/Products';
 import { RoomClasses } from './rooms/RoomClasses';
 import { Availability } from './rooms/Availability';
-import { Locks } from './rooms/Locks';
 import { RoomMusic } from './rooms/RoomMusic';
 import { Kiosks } from './system/Kiosks';
 import { BranchSettings } from './system/BranchSettings';
@@ -39,7 +38,6 @@ export const pages: Record<string, ComponentType<PageProps>> = {
   products: Products,
   'room-classes': RoomClasses,
   availability: Availability,
-  locks: Locks,
   'room-music': RoomMusic,
   kiosks: Kiosks,
   branches: Branches,
