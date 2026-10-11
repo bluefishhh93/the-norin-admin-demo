@@ -43,16 +43,18 @@ export const bookingState = (booking: Booking) =>
     'no-show': 'Không đến'
   })[booking.status];
 
-export const hourlyColumns = (day: string): Column[] => {
-  const base = new Date(`${day}T00:00:00`).getTime();
-  return Array.from({ length: 48 }, (_, i) => ({
-    key: `${day}-${i}`,
-    start: base + i * SLOT_MS,
-    end: base + (i + 1) * SLOT_MS,
-    label: `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
-    sub: ''
-  }));
-};
+export const hourlyColumns = (day: string): Column[] =>
+  Array.from({ length: 48 }, (_, i) => {
+    const start = new Date(`${day}T00:00:00`);
+    start.setHours(Math.floor(i / 2), i % 2 ? 30 : 0, 0, 0);
+    return {
+      key: `${day}-${i}`,
+      start: start.getTime(),
+      end: start.getTime() + SLOT_MS,
+      label: `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
+      sub: ''
+    };
+  });
 
 export const clockOf = (ms: number) =>
   new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -97,12 +99,14 @@ export const buildCells = (
   room: Room,
   cols: Column[],
   now: number,
-  pastAt: 'start' | 'end' = 'end'
+  pastAt: 'start' | 'end' = 'end',
+  cleaning = true
 ): Cell[] => {
   const busy = roomBusy(d, room).sort((a, b) => a.start - b.start);
   const buffer = d.rules.cleaningBuffer * 60000;
+  const pad = cleaning ? 0 : buffer;
   const cells: Cell[] = cols.map((c) => {
-    const hit = busy.find((b) => c.start < b.end && c.end > b.start);
+    const hit = busy.find((b) => c.start < b.end + pad && c.end + pad > b.start);
     if (hit)
       return {
         ...c,
@@ -110,7 +114,7 @@ export const buildCells = (
         booking: hit.booking,
         reason: `${bookingState(hit.booking)} · ${hit.booking.id} · ${hit.booking.customer}`
       };
-    const near = busy.find((b) => c.start < b.end + buffer && c.end > b.end);
+    const near = cleaning && busy.find((b) => c.start < b.end + buffer && c.end > b.end);
     if (near)
       return {
         ...c,
@@ -118,7 +122,7 @@ export const buildCells = (
         booking: near.booking,
         reason: `Dọn dự kiến ${d.rules.cleaningBuffer} phút sau ${near.booking.id}`
       };
-    const ahead = busy.find((b) => c.end > b.start - buffer && c.start < b.start);
+    const ahead = cleaning && busy.find((b) => c.end > b.start - buffer && c.start < b.start);
     if (ahead)
       return {
         ...c,
